@@ -3,27 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#140a26">
+  <meta name="theme-color" content="#0a0b0f">
   <title>Gabung Petualangan</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body class="play">
+<body class="play backdrop">
   <div class="conn" id="conn" hidden>Menyambung ulang…</div>
 
   <!-- 1. Kode ruang -->
   <section class="screen" id="s-code">
     <div class="p-hero">
-      <div class="p-logo">⚔️</div>
-      <h1>Petualangan Melawan <span>Raja Iblis</span></h1>
-      <p>Pindai QR di layar guru, atau masukkan kode ruang.</p>
+      <div class="mark">
+        <span class="mark-top">Petualangan Melawan</span>
+        <span class="mark-main">Raja Iblis</span>
+        <span class="mark-rule"><i></i></span>
+      </div>
+      <p>Pindai QR di layar guru, atau ketik kode ruangnya.</p>
     </div>
-    <form class="p-card" id="form-code">
+    <form class="p-card frame" id="form-code">
       <label>Kode ruang
         <input id="in-code" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="ABCDE" inputmode="text">
       </label>
-      <button class="btn btn-gold btn-big" type="submit">Lanjut ➜</button>
+      <button class="btn btn-primary btn-big" type="submit">Lanjut<i data-icon="arrow"></i></button>
       <p class="err" id="code-err"></p>
     </form>
   </section>
@@ -32,26 +33,26 @@
   <section class="screen" id="s-profile" hidden>
     <div class="p-head">
       <div class="kicker" id="room-title">Ruang <span id="room-label"></span></div>
-      <h2>Buat Petualangmu</h2>
+      <h2>Pilih petualangmu</h2>
     </div>
-    <form id="form-join" class="p-card">
+    <form id="form-join" class="p-card frame">
       <label>Nama petualang
         <input id="in-name" maxlength="16" autocomplete="off" placeholder="Nama kamu">
       </label>
       <div class="label">Pilih karakter</div>
       <div class="char-grid" id="char-grid"></div>
       <div class="char-detail" id="char-detail"></div>
-      <button class="btn btn-gold btn-big" type="submit" id="btn-join">Gabung Party ⚔️</button>
+      <button class="btn btn-primary btn-big" type="submit" id="btn-join"><i data-icon="sword"></i>Gabung party</button>
       <p class="err" id="join-err"></p>
     </form>
   </section>
 
   <!-- 3. Kontroler -->
   <section class="screen" id="s-game" hidden>
-    <header class="p-bar">
+    <header class="p-bar frame">
       <div class="me"><span class="dot" id="me-dot"></span><b id="me-name"></b></div>
-      <div class="stat">⭐ <b id="me-score">0</b></div>
-      <div class="stat">#<b id="me-rank">-</b></div>
+      <div class="stat"><i data-icon="star"></i><b id="me-score">0</b></div>
+      <div class="stat"><i data-icon="crown"></i><b id="me-rank">-</b></div>
     </header>
     <div class="hp-line"><div class="hp-fill" id="me-hp"></div></div>
 
@@ -75,8 +76,8 @@
 
     <div class="view" id="v-locked" hidden>
       <div class="locked-letter" id="locked-letter">A</div>
-      <h2>Jawaban terkunci!</h2>
-      <p>Lihat layar guru… karaktermu bersiap bertarung.</p>
+      <h2>Jawaban terkunci</h2>
+      <p>Lihat layar guru — karaktermu bersiap bertarung.</p>
     </div>
 
     <div class="view" id="v-result" hidden>
@@ -89,22 +90,23 @@
     <div class="view" id="v-final" hidden>
       <div class="res-banner" id="final-banner">KEMENANGAN!</div>
       <canvas class="avatar" id="cv-final" width="300" height="320"></canvas>
-      <div class="final-rank">Peringkat <b id="final-rank">-</b></div>
+      <div class="final-rank">Peringkat<b id="final-rank">-</b></div>
       <div class="final-stats" id="final-stats"></div>
-      <button class="btn" id="btn-leave">Keluar</button>
+      <button class="btn" id="btn-leave"><i data-icon="exit"></i>Keluar</button>
     </div>
   </section>
 
   <section class="screen" id="s-msg" hidden>
     <div class="p-hero">
-      <div class="p-logo" id="msg-icon">🚪</div>
-      <h1 id="msg-title">Kamu keluar dari ruang</h1>
+      <div class="mark"><span class="mark-top">Petualangan Melawan</span><span class="mark-main" style="font-size:2.4rem">Raja Iblis</span><span class="mark-rule"><i></i></span></div>
+      <h2 id="msg-title" style="font:800 1.6rem var(--display);color:var(--gold);margin-top:2rem">Kamu keluar dari ruang</h2>
       <p id="msg-text"></p>
-      <button class="btn btn-gold" onclick="location.href='/play'">Gabung ruang lain</button>
+      <button class="btn btn-primary" style="margin-top:1.4rem" onclick="location.href='/play'">Gabung ruang lain</button>
     </div>
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/icons.js"></script>
   <script src="/js/shared/characters.js"></script>
   <script src="/js/sprites.js"></script>
   <script src="/js/play.js"></script>

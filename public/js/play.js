@@ -85,8 +85,8 @@
   function renderChars(taken) {
     const counts = {};
     taken.forEach((t) => { counts[t] = (counts[t] || 0) + 1; });
-    $('#char-grid').innerHTML = CHARS.map((c) => `
-      <button type="button" class="char-card" data-id="${c.id}" style="--c:${c.color}">
+    $('#char-grid').innerHTML = CHARS.map((c, i) => `
+      <button type="button" class="char-card" data-id="${c.id}" style="--c:${c.color};--i:${i}">
         <canvas width="150" height="170"></canvas>
         <span class="cn">${c.name}</span>
         ${counts[c.id] ? `<span class="taken">${counts[c.id]} teman</span>` : ''}
@@ -101,8 +101,10 @@
     selected = id;
     document.querySelectorAll('.char-card').forEach((b) => b.classList.toggle('sel', b.dataset.id === id));
     const c = BY_ID[id];
-    $('#char-detail').innerHTML = `<b style="color:${c.color}">${c.name}</b> — ${c.role}<br><span>${c.desc}</span>
-      <div class="skills"><span>⚔️ ${c.attackName}</span><span>⚡ Ultimate: ${c.ultimateName}</span></div>`;
+    const d = $('#char-detail');
+    d.style.setProperty('--c', c.color);
+    d.innerHTML = `<div class="cd-role">${c.role}</div><div class="cd-name">${c.name}</div><p>${c.desc}</p>
+      <div class="skills"><span><em>Serangan</em>${c.attackName}</span><span><em>Ultimate</em>${c.ultimateName}</span></div>`;
   }
   $('#char-grid').addEventListener('click', (e) => {
     const b = e.target.closest('.char-card'); if (b) pick(b.dataset.id);
@@ -231,22 +233,22 @@
     const banner = $('#res-banner');
     const cv = $('#cv-result');
     if (r.correct) {
-      banner.textContent = r.ultimate ? '⚡ ULTIMATE! ⚡' : 'BENAR!';
+      banner.textContent = r.ultimate ? 'Ultimate!' : 'Benar!';
       banner.className = 'res-banner good' + (r.ultimate ? ' ult' : '');
       $('#res-points').textContent = `+${r.points}`;
       $('#res-points').className = 'res-points good';
       $('#res-detail').innerHTML = (r.ultimate ? `<b>${ch.ultimateName}</b> mengguncang musuh! ` : `${ch.attackName} mengenai musuh! `) +
-        `Damage <b>${r.damage}</b>.` + (r.streak >= 2 ? `<br>🔥 Beruntun ${r.streak}×${r.streak % 3 === 2 ? ' — satu lagi untuk ULTIMATE!' : ''}` : '') +
-        (r.revived ? '<br>✨ Kamu bangkit kembali!' : '');
+        `Damage <b>${r.damage}</b>.` + (r.streak >= 2 ? `<br><span class="tag">${Icon.flame}Beruntun ${r.streak}×${r.streak % 3 === 2 ? ' · satu lagi untuk ultimate' : ''}</span>` : '') +
+        (r.revived ? `<br><span class="tag">${Icon.heart}Kamu bangkit kembali</span>` : '');
       if (!quiet) setAvatar(cv, p.charId, r.ultimate ? 'ultimate' : 'attack', false, () => setAvatar(cv, p.charId, 'idle', true));
       if (!quiet && navigator.vibrate) navigator.vibrate(r.ultimate ? [60, 40, 60, 40, 120] : 60);
     } else {
-      banner.textContent = r.choice == null ? 'WAKTU HABIS!' : 'SALAH!';
+      banner.textContent = r.choice == null ? 'Waktu habis' : 'Salah!';
       banner.className = 'res-banner bad';
       $('#res-points').textContent = '+0';
       $('#res-points').className = 'res-points bad';
       $('#res-detail').innerHTML = `Jawaban benar: <b class="pill opt-${r.answer}">${LETTERS[r.answer]}</b><br>` +
-        (r.hit ? `Kamu terkena serangan musuh (−${r.hit} HP).` : '') + (r.koNow ? '<br>💫 Kamu pingsan! Jawab benar untuk bangkit.' : '');
+        (r.hit ? `Kamu terkena serangan musuh (−${r.hit} HP).` : '') + (r.koNow ? `<br><span class="tag">${Icon.skull}Kamu pingsan — jawab benar untuk bangkit</span>` : '');
       if (!quiet) setAvatar(cv, p.charId, 'hit', false, () => setAvatar(cv, p.charId, 'idle', true));
       if (!quiet && navigator.vibrate) navigator.vibrate([200]);
     }
@@ -258,9 +260,9 @@
     if (!v) return;
     clearInterval(timerInt);
     const p = v.me;
-    $('#final-banner').textContent = v.victory ? '🏆 KEMENANGAN!' : 'Party Mundur…';
+    $('#final-banner').textContent = v.victory ? 'Kemenangan' : 'Party mundur';
     $('#final-banner').className = 'res-banner ' + (v.victory ? 'good' : 'bad');
-    $('#final-rank').textContent = `${p.rank} dari ${p.total}`;
+    $('#final-rank').innerHTML = `${p.rank}<small style="font-size:1rem;color:var(--dim)"> / ${p.total}</small>`;
     const total = v.totalQuestions || 0;
     $('#final-stats').innerHTML = `<div><b>${p.score}</b><span>poin</span></div><div><b>${p.correct}/${total}</b><span>benar</span></div><div><b>${total ? Math.round((100 * p.correct) / total) : 0}%</b><span>akurasi</span></div>`;
     setAvatar($('#cv-final'), p.charId, v.victory ? 'ultimate' : 'idle', !v.victory, () => setAvatar($('#cv-final'), p.charId, 'idle', true));
@@ -272,21 +274,21 @@
     location.href = '/play';
   };
 
-  function message(icon, title, text) {
-    $('#msg-icon').textContent = icon; $('#msg-title').textContent = title; $('#msg-text').textContent = text;
+  function message(_icon, title, text) {
+    $('#msg-title').textContent = title; $('#msg-text').textContent = text;
     show('s-msg');
   }
   socket.on('p:kicked', () => {
     try { localStorage.removeItem(storeKey(code)); } catch (e) { /* abaikan */ }
     me = null;
-    message('🚪', 'Kamu dikeluarkan dari party', 'Guru mengeluarkanmu dari ruang ini.');
+    message(null, 'Kamu dikeluarkan dari party', 'Guru mengeluarkanmu dari ruang ini.');
   });
   socket.on('p:closed', () => {
     try { localStorage.removeItem(storeKey(code)); } catch (e) { /* abaikan */ }
     const fin = lastState && lastState.state === 'finished';
-    if (!fin) message('🏰', 'Ruang ditutup', 'Guru telah mengakhiri petualangan. Terima kasih sudah bermain!');
+    if (!fin) message(null, 'Ruang ditutup', 'Guru telah mengakhiri petualangan. Terima kasih sudah bermain!');
   });
-  socket.on('p:replaced', () => message('📱', 'Dibuka di perangkat lain', 'Akunmu sedang dipakai di tab/perangkat lain.'));
+  socket.on('p:replaced', () => message(null, 'Dibuka di perangkat lain', 'Akunmu sedang dipakai di tab/perangkat lain.'));
 
   // ---------------------------------------------------------- koneksi
   socket.on('disconnect', () => { $('#conn').hidden = false; });

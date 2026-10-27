@@ -4,21 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Petualangan Melawan Raja Iblis — Modul Ajar Game RPG</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body class="landing">
+<body class="landing backdrop">
   <main class="landing-main">
-    <div class="hero-badge">Modul Ajar Berbasis Game • RPG Isekai</div>
-    <h1>Petualangan Melawan <span>Raja Iblis</span></h1>
-    <p>Siswa bergabung lewat HP, memilih karakter, lalu menjawab soal untuk menyerang pasukan Raja Iblis bersama-sama.</p>
-    <div class="landing-actions">
-      <a class="btn btn-gold btn-big" href="/host">🧙 Saya Guru — Buka Layar Utama</a>
-      <a class="btn btn-big" href="/play">📱 Saya Siswa — Gabung Party</a>
+    <div class="mark anim-rise">
+      <span class="mark-top">Petualangan Melawan</span>
+      <span class="mark-main">Raja Iblis</span>
+      <span class="mark-rule"><i></i></span>
+    </div>
+    <p class="landing-lead anim-rise" style="animation-delay:.15s">Kuis kelas bergaya RPG. Setiap siswa menjadi petualang, menjawab dari HP, dan bersama-sama menumbangkan pasukan Raja Iblis.</p>
+    <div class="landing-actions anim-rise" style="animation-delay:.25s">
+      <a class="btn btn-primary btn-big" href="/host"><i data-icon="sword"></i>Saya guru</a>
+      <a class="btn btn-big" href="/play"><i data-icon="arrow"></i>Saya siswa</a>
     </div>
     <div class="landing-chars" id="chars"></div>
   </main>
+  <script src="/js/icons.js"></script>
   <script src="/js/shared/characters.js"></script>
   <script src="/js/sprites.js"></script>
   <script>
@@ -29,7 +31,7 @@
         const cv = document.createElement('canvas');
         cv.width = 180; cv.height = 210; cv.title = c.name;
         const fig = document.createElement('figure');
-        fig.style.setProperty('--c', c.color);
+        fig.style.setProperty('--c', c.color); fig.style.setProperty('--i', items.length);
         fig.append(cv);
         const cap = document.createElement('figcaption'); cap.textContent = c.name; fig.append(cap);
         wrap.append(fig);

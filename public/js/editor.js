@@ -26,14 +26,14 @@
   function render() {
     const list = $('#q-list');
     list.innerHTML = questions.map((q, i) => `
-      <div class="q-item" data-i="${i}">
+      <div class="q-item" data-i="${i}" style="--i:${i}">
         <div class="q-item-head">
           <span class="q-no">${i + 1}</span>
           <textarea class="q-q" rows="2" placeholder="Tulis pertanyaan…">${esc(q.q)}</textarea>
           <div class="q-tools">
-            <button class="icon" data-act="up" title="Naik">▲</button>
-            <button class="icon" data-act="down" title="Turun">▼</button>
-            <button class="icon danger" data-act="del" title="Hapus">🗑</button>
+            <button class="icon" data-act="up" title="Naik">${Icon.up}</button>
+            <button class="icon" data-act="down" title="Turun">${Icon.down}</button>
+            <button class="icon danger" data-act="del" title="Hapus">${Icon.trash}</button>
           </div>
         </div>
         <div class="q-opts">
@@ -51,10 +51,17 @@
   function updateCount() {
     $('#q-count').textContent = `(${questions.length} soal)`;
     const plan = planPhases(questions.length);
-    const names = GameData.PHASES.map((p) => p.name);
-    $('#plan').innerHTML = questions.length >= GameData.PHASES.length
-      ? '<h3>Pembagian soal per musuh</h3>' + plan.map((p, i) => `<div class="plan-row"><span>${i + 1}. ${names[i]}</span><b>${p} soal</b></div>`).join('')
-      : `<p class="hint warn">Minimal ${GameData.PHASES.length} soal.</p>`;
+    const P = GameData.PHASES;
+    $('#plan').innerHTML = questions.length >= P.length
+      ? plan.map((n, i) => {
+        const ph = P[i];
+        const label = ph.phase ? `Stage ${ph.stage} · Boss fase ${ph.phase}` : `Stage ${ph.stage}`;
+        return `<div class="route-node${ph.boss ? ' boss' : ''}" style="--i:${i}"><span class="dot"></span>
+          <span class="nm"><small>${label}</small>${ph.name}</span><span class="ct">${n}<span>soal</span></span></div>`;
+      }).join('')
+      : `<p class="hint warn">Minimal ${P.length} soal (satu untuk setiap musuh).</p>`;
+    // animasi masuk hanya saat pertama tampil, bukan setiap kali mengetik
+    setTimeout(() => { $('#plan').classList.add('ready'); $('#q-list').classList.add('ready'); }, 900);
   }
 
   // Salinan sisi-klien dari planPhases di server (hanya untuk tampilan)

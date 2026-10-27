@@ -14,6 +14,11 @@ dari **7 karakter**, lalu HP mereka berubah menjadi tombol **A / B / C / D** unt
   yang diberi aba-aba (aura merah, lingkaran bahaya), FINISH!, intro boss dengan layar WARNING,
   transformasi boss, dan mode **BOSS MENGAMUK** saat HP boss < 35%.
 
+- **Prolog pembuka**: narasi singkat, lingkaran pemanggilan, para siswa "dipanggil" ke dunia lain satu per satu,
+  lalu judul game. Guru dapat **klik layar** untuk melewatinya.
+- Tampilan bergaya menu JRPG; font disimpan di `public/fonts` sehingga tetap tampil tanpa internet
+  (Grenze Gotisch, Barlow Condensed, Alegreya Sans — lisensi SIL Open Font License).
+
 ## Karakter
 
 | Karakter | Serangan | Ultimate | Keistimewaan |

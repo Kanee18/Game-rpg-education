@@ -4,23 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Layar Guru — Petualangan Melawan Raja Iblis</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body class="host">
+<body class="host backdrop">
 
-<!-- ============================ PENGATURAN SOAL ============================ -->
+<!-- ============================ PERSIAPAN ============================ -->
 <section id="setup" class="page">
-  <header class="hero">
-    <div class="hero-badge">Modul Ajar Berbasis Game</div>
-    <h1>Petualangan Melawan <span>Raja Iblis</span></h1>
-    <p>Siapkan soal, buat ruang petualangan, lalu siswa memindai QR dengan HP untuk bergabung ke party (maks. 20 petualang).</p>
+  <header class="setup-head anim-rise">
+    <div class="mark">
+      <span class="mark-top">Petualangan Melawan</span>
+      <span class="mark-main">Raja Iblis</span>
+      <span class="mark-rule"><i></i></span>
+    </div>
+    <p>Susun soal, buka ruang petualangan, lalu tampilkan layar ini di proyektor. Siswa bergabung lewat HP — hingga 20 petualang dalam satu party.</p>
   </header>
 
   <div class="setup-grid">
-    <aside class="card settings">
-      <h2>⚙️ Pengaturan</h2>
+    <aside class="frame settings">
+      <div class="frame-title">Persiapan</div>
       <label>Judul materi
         <input id="set-title" maxlength="80" placeholder="mis. Matematika Kelas 7 — Pecahan">
       </label>
@@ -36,31 +37,26 @@
         </select>
       </label>
       <label class="check"><input type="checkbox" id="set-shuffle"> Acak urutan soal</label>
-      <div class="plan" id="plan"></div>
-      <button class="btn btn-gold btn-big" id="btn-create">⚔️ Buat Ruang Petualangan</button>
+      <div class="frame-title" style="margin-top:1.4rem">Rute petualangan</div>
+      <div class="route" id="plan"></div>
+      <button class="btn btn-primary btn-big" id="btn-create"><i data-icon="sword"></i>Buka Ruang Petualangan</button>
       <p class="hint" id="setup-error"></p>
-      <div class="howto">
-        <h3>Alur permainan</h3>
-        <ol>
-          <li>Tampilkan layar ini di proyektor/TV.</li>
-          <li>Siswa memindai QR → isi nama → pilih karakter.</li>
-          <li>HP siswa berubah menjadi tombol <b>A B C D</b>.</li>
-          <li>Jawaban benar = karakter menyerang & dapat poin. Salah = terkena serangan musuh.</li>
-          <li>Benar 3× berturut-turut = <b>ULTIMATE!</b></li>
-          <li>Kalahkan 3 bawahan lalu Raja Iblis (punya Fase 2).</li>
-        </ol>
-      </div>
+      <ol class="steps">
+        <li><span>Siswa memindai QR, mengisi nama, dan <b>memilih karakter</b>.</span></li>
+        <li><span>HP berubah jadi tombol <b>A B C D</b>. Benar = menyerang, salah = diserang.</span></li>
+        <li><span>Benar <b>3× beruntun</b> memicu ULTIMATE. Taklukkan semua stage hingga Raja Iblis.</span></li>
+      </ol>
     </aside>
 
-    <main class="card editor">
+    <main class="frame editor">
       <div class="editor-head">
-        <h2>📜 Bank Soal <small id="q-count"></small></h2>
+        <div class="frame-title">Bank soal <small id="q-count"></small></div>
         <div class="editor-actions">
-          <button class="btn btn-sm" id="btn-add">＋ Tambah soal</button>
-          <button class="btn btn-sm" id="btn-paste">📋 Tempel teks</button>
-          <button class="btn btn-sm" id="btn-import">📂 Impor JSON</button>
-          <button class="btn btn-sm" id="btn-export">💾 Ekspor JSON</button>
-          <button class="btn btn-sm btn-ghost" id="btn-reset">↺ Contoh soal</button>
+          <button class="btn btn-sm" id="btn-add"><i data-icon="plus"></i>Soal</button>
+          <button class="btn btn-sm" id="btn-paste"><i data-icon="paste"></i>Tempel teks</button>
+          <button class="btn btn-sm" id="btn-import"><i data-icon="import"></i>Impor</button>
+          <button class="btn btn-sm" id="btn-export"><i data-icon="export"></i>Ekspor</button>
+          <button class="btn btn-sm btn-ghost" id="btn-reset" title="Kembalikan contoh soal"><i data-icon="reset"></i>Contoh</button>
           <input type="file" id="file-import" accept=".json,application/json" hidden>
         </div>
       </div>
@@ -70,9 +66,9 @@
 </section>
 
 <!-- Modal tempel teks -->
-<dialog id="paste-dialog" class="dialog">
+<dialog id="paste-dialog" class="dialog frame">
   <form method="dialog">
-    <h2>📋 Tempel soal dari teks</h2>
+    <div class="frame-title">Tempel soal dari teks</div>
     <p class="hint">Pisahkan tiap soal dengan baris kosong. Tandai jawaban benar dengan <b>*</b> di akhir pilihan, atau tulis <code>Jawaban: B</code>.</p>
 <pre class="example">1. Ibu kota Indonesia adalah …
 A. Bandung
@@ -91,7 +87,7 @@ Jawaban: B</pre>
     <div class="dialog-actions">
       <label class="check"><input type="checkbox" id="paste-replace"> Ganti semua soal yang ada</label>
       <button class="btn" value="cancel">Batal</button>
-      <button class="btn btn-gold" id="paste-ok" value="ok">Tambahkan</button>
+      <button class="btn btn-primary" id="paste-ok" value="ok">Tambahkan</button>
     </div>
   </form>
 </dialog>
@@ -102,15 +98,16 @@ Jawaban: B</pre>
     <canvas id="cv"></canvas>
     <div id="ui">
       <!-- Lobby -->
-      <div id="lobby" class="panel">
+      <div id="lobby" class="frame">
         <div class="lobby-left">
-          <div class="lobby-title">
-            <div class="kicker" id="lobby-kicker">Ruang Petualangan</div>
-            <h1>Bergabunglah dengan Party!</h1>
-            <p>Pindai QR dengan kamera HP, isi nama, lalu pilih karakter.</p>
+          <div class="mark">
+            <span class="mark-top">Petualangan Melawan</span>
+            <span class="mark-main">Raja Iblis</span>
+            <span class="mark-rule"><i></i></span>
           </div>
+          <div class="lobby-sub" id="lobby-kicker">Pindai untuk bergabung</div>
           <div class="qr-card">
-            <img id="qr" alt="QR untuk bergabung">
+            <div class="qr-frame"><img id="qr" alt="QR untuk bergabung"></div>
             <div class="qr-info">
               <div class="label">Kode ruang</div>
               <div class="code" id="room-code">-----</div>
@@ -120,27 +117,32 @@ Jawaban: B</pre>
           </div>
         </div>
         <div class="lobby-right">
-          <div class="party-count"><span id="party-count">0</span>/20 petualang</div>
+          <div class="roster-head">
+            <div class="frame-title">Party</div>
+            <div class="party-count"><span id="party-count">0</span><small>/20</small></div>
+          </div>
           <div id="party-list" class="party-list"></div>
-          <button class="btn btn-gold btn-big" id="btn-start" disabled>⚔️ Mulai Petualangan</button>
-          <p class="hint">Klik nama untuk mengeluarkan pemain.</p>
+          <div class="lobby-actions">
+            <button class="btn btn-primary btn-big" id="btn-start" disabled><i data-icon="sword"></i>Mulai Petualangan</button>
+            <p class="hint">Klik kartu siswa untuk mengeluarkannya dari party.</p>
+          </div>
         </div>
       </div>
 
       <!-- Panel soal -->
-      <div id="qpanel" hidden>
+      <div id="qpanel" class="frame" hidden>
         <div class="q-top">
           <div class="q-num" id="q-num">Soal 1/20</div>
           <div class="q-answered" id="q-answered-box"></div>
         </div>
         <div class="q-text" id="q-text"></div>
         <div class="q-options" id="q-options"></div>
-        <div class="q-timer"><div class="q-timer-bar" id="q-timer-bar"></div><div class="q-timer-num" id="q-timer-num">20</div></div>
+        <div class="q-timer"><div class="q-timer-track"><div class="q-timer-bar" id="q-timer-bar"></div></div><div class="q-timer-num" id="q-timer-num">20</div></div>
       </div>
 
       <!-- Papan peringkat kecil -->
-      <div id="leader" class="panel" hidden>
-        <h3>🏆 Peringkat</h3>
+      <div id="leader" class="frame" hidden>
+        <div class="frame-title">Peringkat</div>
         <ol id="leader-list"></ol>
       </div>
 
@@ -152,23 +154,23 @@ Jawaban: B</pre>
 
       <!-- Tombol kontrol -->
       <div id="controls" hidden>
-        <button class="btn" id="btn-skip" hidden>⏭ Akhiri waktu</button>
-        <button class="btn btn-gold" id="btn-next" hidden>▶ Soal berikutnya</button>
-        <button class="btn btn-ghost" id="btn-auto" title="Lanjut otomatis">Auto: Mati</button>
-        <button class="btn btn-ghost" id="btn-mute" title="Suara">🔊</button>
-        <button class="btn btn-ghost" id="btn-full" title="Layar penuh">⛶</button>
-        <button class="btn btn-ghost" id="btn-quit" title="Akhiri permainan">✕</button>
+        <button class="btn" id="btn-skip" hidden><i data-icon="skip"></i>Akhiri waktu</button>
+        <button class="btn btn-primary" id="btn-next" hidden><i data-icon="play"></i><span>Soal berikutnya</span></button>
+        <button class="btn btn-ghost" id="btn-auto" title="Lanjut otomatis"><i data-icon="loop"></i><span>Auto</span></button>
+        <button class="btn btn-ghost btn-icon" id="btn-mute" title="Suara"><i data-icon="sound"></i></button>
+        <button class="btn btn-ghost btn-icon" id="btn-full" title="Layar penuh"><i data-icon="full"></i></button>
+        <button class="btn btn-ghost btn-icon" id="btn-quit" title="Akhiri permainan"><i data-icon="close"></i></button>
       </div>
 
       <!-- Hasil akhir -->
-      <div id="final" class="panel" hidden>
-        <h1 id="final-title">KEMENANGAN!</h1>
+      <div id="final" class="frame" hidden>
+        <h1 id="final-title">Kemenangan</h1>
         <p id="final-sub"></p>
         <div class="podium" id="podium"></div>
         <div class="final-table-wrap"><table class="final-table" id="final-table"></table></div>
         <div class="final-actions">
-          <button class="btn" id="btn-csv">⬇️ Unduh hasil (CSV)</button>
-          <button class="btn btn-gold" id="btn-again">↺ Main lagi (soal sama)</button>
+          <button class="btn" id="btn-csv"><i data-icon="download"></i>Unduh hasil (CSV)</button>
+          <button class="btn btn-primary" id="btn-again"><i data-icon="reset"></i>Main lagi</button>
           <button class="btn btn-ghost" id="btn-done">Selesai</button>
         </div>
       </div>
@@ -178,6 +180,7 @@ Jawaban: B</pre>
 </section>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="/js/icons.js"></script>
 <script src="/js/shared/characters.js"></script>
 <script src="/js/questions-default.js"></script>
 <script src="/js/sfx.js"></script>

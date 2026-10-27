@@ -13,6 +13,30 @@
   const TRAIL_COL = { fireWave: '255,130,30', fireClaw: '255,110,40', slash: '255,210,90', fireball: '255,140,40', orb: '255,90,30', holy: '255,240,170', arrow: '140,255,170', dagger: '200,130,255', shockwave: '130,190,255', claw: '200,140,255', shard: '200,140,255', rock: '170,170,200', blob: '170,90,255', boneSlash: '110,200,255' };
   const rand = (a, b) => a + Math.random() * (b - a);
   const glow = (ctx, x, y, r, color, a = 1) => Enemies.glow(ctx, x, y, r, color, a);
+  const F = {
+    display: '"Grenze Gotisch", Georgia, serif',
+    hud: '"Barlow Condensed", "Arial Narrow", sans-serif',
+    body: '"Alegreya Sans", "Segoe UI", sans-serif',
+  };
+  // muat font lebih dulu agar teks canvas tidak memakai font cadangan
+  if (document.fonts) ['800 20px "Grenze Gotisch"', '600 20px "Grenze Gotisch"', '700 20px "Barlow Condensed"', '800 20px "Barlow Condensed"', 'italic 800 20px "Barlow Condensed"', '700 20px "Alegreya Sans"', '800 20px "Alegreya Sans"'].forEach((f) => document.fonts.load(f));
+
+  // Jendela gaya JRPG: besi gelap, garis emas tipis, ornamen sudut
+  function frameBox(ctx, x, y, w, h, o = {}) {
+    const c = o.corner || 18;
+    ctx.save();
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, o.top || 'rgba(28,31,40,0.93)'); g.addColorStop(1, o.bottom || 'rgba(12,13,18,0.93)');
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#4a3e26'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.strokeStyle = 'rgba(210,165,75,0.16)'; ctx.strokeRect(x + 5.5, y + 5.5, w - 11, h - 11);
+    ctx.fillStyle = '#d2a54b';
+    for (const [cx, cy, sx, sy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]]) {
+      ctx.fillRect(sx > 0 ? cx : cx - c, sy > 0 ? cy : cy - 2, c, 2);
+      ctx.fillRect(sx > 0 ? cx : cx - 2, sy > 0 ? cy : cy - c, 2, c);
+    }
+    ctx.restore();
+  }
 
   class Battle {
     constructor(canvas) {
@@ -73,7 +97,7 @@
     focus(x, y, z = 1, rate = 4) { this.camT = { x, y, z, rate }; }
     resetCam(rate = 3) { this.focus(W / 2, H / 2, 1, rate); }
     impactFrame(ms = 90) { this.impact = Math.max(this.impact, ms / 1000); }
-    callout(text, color = '#fde68a', opts = {}) {
+    callout(text, color = '#f0d48a', opts = {}) {
       this.callouts.push({ text, color, t: 0, dur: opts.dur || 1.3, size: opts.size || 150, y: opts.y || H * 0.42, sub: opts.sub || '' });
     }
     partyCenter() {
@@ -183,7 +207,7 @@
       });
     }
 
-    showBanner(title, text, color = '#facc15', dur = 2000, sub = '') {
+    showBanner(title, text, color = '#d2a54b', dur = 2000, sub = '') {
       this.banner = { title, text, sub, color, t: 0, dur: dur / 1000 };
     }
 
@@ -252,8 +276,8 @@
         this.dmgSlot = ((this.dmgSlot || 0) + 1) % SLOTS.length;
         const [ox, oy] = SLOTS[this.dmgSlot];
         const tx = p.x + ox + rand(-15, 15), ty = p.y + oy + rand(-10, 10);
-        if (crit) this.addText(tx, ty - 58, opts.ult ? 'ULTIMATE!' : 'KRITIS!', opts.ult ? '#c4b5fd' : '#fb923c', 34, { vy: -60, dur: 1.1 });
-        this.addText(tx, ty, String(dmg), big ? '#ffd23f' : crit ? '#fde047' : '#ffffff', big ? 110 : crit ? 72 : 50, { vy: -90, stroke: crit || big ? '#7c2d12' : '#1a0b12' });
+        if (crit) this.addText(tx, ty - 58, opts.ult ? 'ULTIMATE!' : 'KRITIS!', opts.ult ? '#c4b5fd' : '#f08a4b', 34, { vy: -60, dur: 1.1 });
+        this.addText(tx, ty, String(dmg), big ? '#ffd23f' : crit ? '#f0d48a' : '#ffffff', big ? 110 : crit ? 72 : 50, { vy: -90, stroke: crit || big ? '#7c2d12' : '#1a0b12' });
         if (this.combo) { this.combo.hits++; this.combo.dmg += dmg; this.combo.pop = 1; this.combo.t = 0; }
       }
       if (opts.hpDrop) e.shownHp = Math.max(0, e.shownHp - opts.hpDrop);
@@ -339,7 +363,7 @@
           } else if (type === 'dagger') {
             ctx.rotate(self.t * 25);
             ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = '#e5e7eb'; ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+            ctx.fillStyle = '#ece3cf'; ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(30, 0); ctx.lineTo(0, -7); ctx.lineTo(-10, 0); ctx.lineTo(0, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
             ctx.fillStyle = '#3b2a4a'; ctx.fillRect(-24, -4, 16, 8);
             ctx.globalCompositeOperation = 'lighter';
@@ -451,7 +475,7 @@
       if (be && be.boss && be.dying < 0 && be.shownHp > 0 && be.shownHp / be.hpMax < 0.35) {
         if (!this.enraged) {
           this.enraged = true;
-          this.callout('BOSS MENGAMUK!', '#f87171', { size: 104, y: H * 0.18, dur: 1.6, sub: 'Serangannya kini lebih ganas — jangan sampai salah!' });
+          this.callout('BOSS MENGAMUK!', '#f19b8f', { size: 104, y: H * 0.18, dur: 1.6, sub: 'Serangannya kini lebih ganas — jangan sampai salah!' });
           Sfx.roar();
         }
         be.rageT = Math.max(be.rageT || 0, 0.4);
@@ -523,6 +547,7 @@
       ctx.translate(-cx, -cy);
       Backgrounds.draw(ctx, this.stage, this.phase, this.t, this.scroll, this.lightning);
 
+      this.drawSummon();
       this.fx.filter((f) => f.layer === 'back').forEach((f) => f.draw(ctx));
       // urutkan aktor menurut kedalaman (y)
       const drawList = [...this.actors.values()].sort((a, b) => a.y - b.y);
@@ -547,6 +572,8 @@
       if (this.banner) this.drawBanner();
       if (this.fade > 0.01) { ctx.fillStyle = `rgba(0,0,0,${this.fade})`; ctx.fillRect(0, 0, W, H); }
       this.drawWarning();
+      if (this.titleCard) this.drawTitleCard();
+      if (this.story) this.drawStory();
     }
 
     drawActorShadow(a) {
@@ -592,36 +619,47 @@
     drawTag(a) {
       if (a.hidden) return;
       const ctx = this.ctx;
-      const x = a.x + a.ox, y = a.y + 10;
+      const x = a.x + a.ox, y = a.y + 12;
+      const fs = Math.round(a.h * 0.11 + 8);
       ctx.save();
-      ctx.font = `800 ${Math.round(a.h * 0.12 + 6)}px Nunito, system-ui, sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      const w = ctx.measureText(a.name).width + 18;
-      ctx.fillStyle = 'rgba(10,6,24,0.72)';
-      roundRect(ctx, x - w / 2, y, w, a.h * 0.12 + 14, 8); ctx.fill();
-      ctx.strokeStyle = a.char.color; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = '#fff';
-      ctx.fillText(a.name, x, y + 4);
-      // bar HP
-      const bw = Math.max(60, w - 10), by = y + a.h * 0.12 + 18;
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - bw / 2, by, bw, 7);
+      ctx.font = `800 ${fs}px ${F.body}`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const w = Math.max(ctx.measureText(a.name).width + 22, a.h * 0.42);
+      const h = fs + 10;
+      // pelat nama: besi gelap + garis warna kelas di kiri
+      ctx.fillStyle = 'rgba(10,11,15,0.82)';
+      ctx.fillRect(x - w / 2, y, w, h);
+      ctx.fillStyle = a.char.color; ctx.fillRect(x - w / 2, y, 3, h);
+      ctx.fillStyle = '#ece3cf';
+      ctx.fillText(a.name, x + 1, y + h / 2 + 1);
+      // bar HP tipis
+      const by = y + h + 3;
+      ctx.fillStyle = 'rgba(10,11,15,0.85)'; ctx.fillRect(x - w / 2, by, w, 6);
       const k = clamp(a.hp / 100);
-      ctx.fillStyle = k > 0.5 ? '#4ade80' : k > 0.25 ? '#facc15' : '#ef4444';
-      ctx.fillRect(x - bw / 2, by, bw * k, 7);
-      // tanda sudah menjawab
+      ctx.fillStyle = k > 0.5 ? '#5cc48a' : k > 0.25 ? '#e0b23c' : '#e2513a';
+      ctx.fillRect(x - w / 2 + 1, by + 1, (w - 2) * k, 4);
+      // penanda sudah menjawab: berlian di atas kepala
       if (this.questionActive) {
         const done = this.answered.has(a.id);
-        const cy = a.y - a.h * 1.08, r = a.h * 0.09 + 6;
-        ctx.beginPath(); ctx.arc(x, cy, r, 0, TAU);
-        ctx.fillStyle = done ? '#22c55e' : 'rgba(20,14,40,0.75)'; ctx.fill();
-        ctx.lineWidth = 3; ctx.strokeStyle = done ? '#bbf7d0' : 'rgba(255,255,255,0.4)'; ctx.stroke();
-        ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
-        ctx.font = `900 ${r * 1.2}px Nunito, sans-serif`;
-        ctx.fillText(done ? '✔' : '…', x, cy + 1);
-      }
+        const cy = a.y - a.h * 1.06, r = a.h * 0.07 + 7;
+        const pop = done ? 1 + 0.25 * Math.max(0, 1 - (this.t - (a.doneAt || 0)) * 4) : 1;
+        if (done && !a.wasDone) a.doneAt = this.t;
+        a.wasDone = done;
+        ctx.save(); ctx.translate(x, cy); ctx.scale(pop, pop); ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = done ? '#3f9e6a' : 'rgba(10,11,15,0.75)';
+        ctx.fillRect(-r * 0.75, -r * 0.75, r * 1.5, r * 1.5);
+        ctx.lineWidth = 2; ctx.strokeStyle = done ? '#bff0d2' : 'rgba(210,165,75,0.6)';
+        ctx.strokeRect(-r * 0.75, -r * 0.75, r * 1.5, r * 1.5);
+        ctx.restore();
+        if (done) {
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          ctx.beginPath(); ctx.moveTo(x - r * 0.35, cy); ctx.lineTo(x - r * 0.05, cy + r * 0.3); ctx.lineTo(x + r * 0.4, cy - r * 0.3); ctx.stroke();
+        }
+      } else a.wasDone = false;
       if (a.ko) {
-        ctx.font = `900 ${a.h * 0.14}px Nunito, sans-serif`; ctx.fillStyle = '#fca5a5'; ctx.textBaseline = 'middle';
-        ctx.fillText('💫 KO', x, a.y - a.h * 0.6);
+        ctx.font = `italic 800 ${a.h * 0.15}px ${F.hud}`; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 5; ctx.strokeStyle = '#1a0606'; ctx.strokeText('K.O.', x, a.y - a.h * 0.62);
+        ctx.fillStyle = '#f19b8f'; ctx.fillText('K.O.', x, a.y - a.h * 0.62);
       }
       ctx.restore();
     }
@@ -721,18 +759,16 @@
         ctx.rotate(-0.08);
         ctx.scale(pop, pop);
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = 'italic 900 112px Nunito, system-ui, sans-serif';
+        ctx.font = `italic 800 112px ${F.hud}`;
         ctx.lineWidth = 16; ctx.strokeStyle = '#3b0a0a'; ctx.lineJoin = 'round';
         ctx.strokeText(String(cb.hits), 0, 0);
-        const gg = ctx.createLinearGradient(0, -50, 0, 50);
-        gg.addColorStop(0, '#fff7c2'); gg.addColorStop(0.5, '#facc15'); gg.addColorStop(1, '#f97316');
-        ctx.fillStyle = gg; ctx.fillText(String(cb.hits), 0, 0);
-        ctx.font = 'italic 900 40px Nunito, sans-serif';
-        ctx.lineWidth = 8; ctx.strokeText('HIT COMBO', 0, 70);
-        ctx.fillStyle = '#fff'; ctx.fillText('HIT COMBO', 0, 70);
-        ctx.font = '800 26px Nunito, sans-serif';
-        ctx.lineWidth = 6; ctx.strokeText(`${cb.dmg} damage`, 0, 112);
-        ctx.fillStyle = '#fde68a'; ctx.fillText(`${cb.dmg} damage`, 0, 112);
+        ctx.fillStyle = '#f0d48a'; ctx.fillText(String(cb.hits), 0, 0);
+        ctx.fillStyle = '#b3302c'; ctx.beginPath(); ctx.moveTo(-96, 46); ctx.lineTo(110, 46); ctx.lineTo(96, 92); ctx.lineTo(-110, 92); ctx.fill();
+        ctx.font = `italic 800 38px ${F.hud}`;
+        ctx.fillStyle = '#fff2ec'; ctx.fillText('HIT COMBO', 0, 70);
+        ctx.font = `700 24px ${F.hud}`;
+        ctx.lineWidth = 6; ctx.strokeStyle = '#0a0b0f'; ctx.strokeText(`${cb.dmg} DAMAGE`, 0, 116);
+        ctx.fillStyle = '#ece3cf'; ctx.fillText(`${cb.dmg} DAMAGE`, 0, 116);
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
       }
       // callout besar (FINISH!, K.O.!, SERANGAN!)
@@ -745,11 +781,18 @@
         ctx.globalAlpha = a;
         ctx.translate(W / 2, c.y); ctx.rotate(-0.05); ctx.scale(sc, sc);
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = `italic 900 ${c.size}px Cinzel, Georgia, serif`;
-        ctx.lineWidth = c.size * 0.12; ctx.strokeStyle = '#120414'; ctx.lineJoin = 'round';
-        ctx.strokeText(c.text, 0, 0);
-        ctx.fillStyle = c.color; ctx.fillText(c.text, 0, 0);
-        if (c.sub) { ctx.font = '800 34px Nunito, sans-serif'; ctx.lineWidth = 7; ctx.strokeText(c.sub, 0, c.size * 0.62); ctx.fillStyle = '#fff'; ctx.fillText(c.sub, 0, c.size * 0.62); }
+        const txt = c.text.toUpperCase();
+        ctx.font = `italic 800 ${c.size * 1.05}px ${F.hud}`;
+        const tw = ctx.measureText(txt).width;
+        // pita miring di belakang teks
+        const bw = (tw / 2 + 60) * clamp(inK * 1.3), bh = c.size * 0.36;
+        ctx.fillStyle = 'rgba(10,11,15,0.82)';
+        ctx.beginPath(); ctx.moveTo(-bw, -bh); ctx.lineTo(bw + 30, -bh); ctx.lineTo(bw, bh); ctx.lineTo(-bw - 30, bh); ctx.fill();
+        ctx.fillStyle = c.color; ctx.fillRect(-bw - 10, bh - 3, (bw + 10) * 2, 3);
+        ctx.lineWidth = c.size * 0.1; ctx.strokeStyle = '#0a0b0f'; ctx.lineJoin = 'round';
+        ctx.strokeText(txt, 0, 2);
+        ctx.fillStyle = c.color; ctx.fillText(txt, 0, 2);
+        if (c.sub) { ctx.font = `700 32px ${F.body}`; ctx.lineWidth = 7; ctx.strokeText(c.sub, 0, c.size * 0.66); ctx.fillStyle = '#ece3cf'; ctx.fillText(c.sub, 0, c.size * 0.66); }
         ctx.restore();
       }
       // kartu nama boss: panel miring meluncur dari kiri
@@ -766,14 +809,14 @@
         ctx.fillStyle = gg; ctx.fillRect(80, y0, W * 0.78, 230);
         ctx.fillStyle = b.color; ctx.fillRect(80, y0, W * 0.7, 6); ctx.fillRect(80, y0 + 224, W * 0.55, 4);
         ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-        ctx.font = '900 30px Nunito, sans-serif'; ctx.fillStyle = b.color;
+        ctx.font = `800 30px ${F.hud}`; ctx.fillStyle = b.color;
         ctx.fillText(b.kicker, 230, y0 + 44);
-        ctx.font = '900 104px Cinzel, Georgia, serif';
+        ctx.font = `800 104px ${F.display}`;
         ctx.lineWidth = 10; ctx.strokeStyle = '#000'; ctx.strokeText(b.name, 220, y0 + 122);
         const ng = ctx.createLinearGradient(0, y0 + 70, 0, y0 + 170);
         ng.addColorStop(0, '#fff7e0'); ng.addColorStop(1, b.color);
         ctx.fillStyle = ng; ctx.fillText(b.name, 220, y0 + 122);
-        ctx.font = 'italic 800 32px Nunito, sans-serif'; ctx.fillStyle = '#fde68a';
+        ctx.font = `700 32px ${F.body}`; ctx.fillStyle = '#ece3cf';
         ctx.fillText(b.title, 236, y0 + 192);
         ctx.restore();
       }
@@ -800,7 +843,7 @@
           for (const [yy, dir] of [[H * 0.3, 1], [H * 0.7, -1]]) {
             ctx.save();
             ctx.translate(0, yy);
-            ctx.fillStyle = '#facc15'; ctx.fillRect(0, -48, W, 96);
+            ctx.fillStyle = '#d2a54b'; ctx.fillRect(0, -48, W, 96);
             ctx.beginPath(); ctx.rect(0, -48, W, 96); ctx.clip();
             ctx.fillStyle = '#111';
             const off = (wt * 260 * dir) % 80;
@@ -808,11 +851,11 @@
             ctx.restore();
           }
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.font = 'italic 900 150px Cinzel, Georgia, serif';
+          ctx.font = `italic 800 170px ${F.hud}`;
           ctx.lineWidth = 18; ctx.strokeStyle = '#120000'; ctx.lineJoin = 'round';
           ctx.strokeText('WARNING', W / 2, H * 0.5);
           ctx.fillStyle = `rgb(255,${60 + 60 * pul | 0},${60 + 60 * pul | 0})`; ctx.fillText('WARNING', W / 2, H * 0.5);
-          ctx.font = '900 34px Nunito, sans-serif'; ctx.lineWidth = 8;
+          ctx.font = `800 34px ${F.hud}`; ctx.lineWidth = 8;
           ctx.strokeText(this.warning.text, W / 2, H * 0.5 + 105); ctx.fillStyle = '#fff'; ctx.fillText(this.warning.text, W / 2, H * 0.5 + 105);
           ctx.globalAlpha = 1;
         }
@@ -822,36 +865,46 @@
 
     drawEnemyBar() {
       const e = this.enemy, ctx = this.ctx;
-      const x = 1250, y = 34, w = 630, h = 30;
+      const x = 1220, y = 30, w = 670, bh = 22;
       ctx.save();
-      ctx.fillStyle = 'rgba(12,6,26,0.78)';
-      roundRect(ctx, x - 16, y - 8, w + 32, 96, 14); ctx.fill();
-      ctx.strokeStyle = 'rgba(250,204,21,0.6)'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.font = '900 28px Cinzel, Georgia, serif'; ctx.fillStyle = '#fde68a'; ctx.textBaseline = 'top';
-      ctx.fillText(e.name, x, y);
-      ctx.font = '700 18px Nunito, sans-serif'; ctx.fillStyle = '#c4b5fd'; ctx.textAlign = 'right';
-      ctx.fillText(`STAGE ${this.stage}/4${e.boss ? ` • FASE ${e.phase}/2` : ''}`, x + w, y + 6);
+      frameBox(ctx, x - 22, y - 12, w + 44, 112, { corner: 16 });
+      // nama + label stage
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = `800 38px ${F.display}`; ctx.fillStyle = '#f0d48a';
+      ctx.fillText(e.name, x, y + 36);
+      ctx.textAlign = 'right';
+      ctx.font = `700 18px ${F.hud}`; ctx.fillStyle = '#9b9384';
+      ctx.fillText(`STAGE ${this.stage}/4${e.boss ? `  ·  FASE ${e.phase}/2` : ''}`.split('').join(String.fromCharCode(8202)), x + w, y + 30);
       if (e.boss) {
-        const pul = this.enraged ? 0.6 + 0.4 * Math.sin(this.t * 10) : 1;
+        const pul = this.enraged ? 0.55 + 0.45 * Math.sin(this.t * 10) : 1;
         ctx.textAlign = 'left';
-        ctx.fillStyle = this.enraged ? `rgba(248,113,113,${pul})` : '#f97316';
-        ctx.font = '900 16px Nunito, sans-serif';
-        ctx.fillText(this.enraged ? '☠ BOSS • MENGAMUK' : '☠ BOSS', x, y - 26);
+        ctx.font = `800 17px ${F.hud}`;
+        const label = this.enraged ? 'BOSS  ·  MENGAMUK' : 'BOSS';
+        const lw = ctx.measureText(label).width + 20;
+        ctx.globalAlpha = pul;
+        ctx.fillStyle = '#b3302c'; ctx.fillRect(x - 22, y - 38, lw, 24);
+        ctx.fillStyle = '#fff2ec'; ctx.fillText(label, x - 12, y - 20);
+        ctx.globalAlpha = 1;
       }
+      // bar HP bersegmen
       ctx.textAlign = 'left';
-      const by = y + 40;
-      ctx.fillStyle = '#1b0f22'; roundRect(ctx, x, by, w, h, 8); ctx.fill();
+      const by = y + 52;
+      ctx.fillStyle = '#07080b'; ctx.fillRect(x, by, w, bh);
       const bar = clamp((e.barHp == null ? e.shownHp : e.barHp) / e.hpMax);
       const ghost = clamp(e.ghostHp == null ? bar : e.ghostHp);
       e.ghostHp = ghost + (bar - ghost) * 0.04;
-      ctx.fillStyle = '#fbbf24'; roundRect(ctx, x, by, w * ghost, h, 8); ctx.fill();
-      const g = ctx.createLinearGradient(0, by, 0, by + h);
-      g.addColorStop(0, '#f87171'); g.addColorStop(1, '#b91c1c');
+      ctx.fillStyle = '#f0d48a'; ctx.fillRect(x, by, w * ghost, bh);
+      const g = ctx.createLinearGradient(0, by, 0, by + bh);
+      g.addColorStop(0, '#e2513a'); g.addColorStop(0.5, '#b3302c'); g.addColorStop(1, '#6e1512');
       if (this.enraged) ctx.globalAlpha = 0.75 + 0.25 * Math.sin(this.t * 10);
-      ctx.fillStyle = g; roundRect(ctx, x, by, w * bar, h, 8); ctx.fill();
+      ctx.fillStyle = g; ctx.fillRect(x, by, w * bar, bh);
       ctx.globalAlpha = 1;
-      ctx.font = '800 18px Nunito, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(`${Math.max(0, Math.round(e.barHp == null ? e.shownHp : e.barHp))} / ${e.hpMax}`, x + w / 2, by + h / 2 + 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x, by + 2, w * bar, 3);
+      ctx.fillStyle = 'rgba(7,8,11,0.85)';
+      for (let i = 1; i < 10; i++) ctx.fillRect(x + (w * i) / 10 - 1, by, 2, bh);
+      ctx.strokeStyle = '#4a3e26'; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, by - 0.5, w + 1, bh + 1);
+      ctx.font = `700 17px ${F.hud}`; ctx.fillStyle = '#9b9384'; ctx.textAlign = 'right';
+      ctx.fillText(`${Math.max(0, Math.round(e.barHp == null ? e.shownHp : e.barHp))} / ${e.hpMax}`, x + w, by + bh + 20);
       ctx.restore();
     }
 
@@ -892,7 +945,7 @@
         const k = t.t / t.dur;
         const pop = t.t < 0.12 ? 0.6 + (t.t / 0.12) * 0.6 : t.t < 0.25 ? 1.2 - ((t.t - 0.12) / 0.13) * 0.2 : 1;
         ctx.globalAlpha = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1;
-        ctx.font = `900 ${t.size * pop}px Nunito, system-ui, sans-serif`;
+        ctx.font = `800 ${t.size * pop}px ${F.hud}`;
         ctx.lineWidth = t.size * 0.16; ctx.strokeStyle = t.stroke; ctx.lineJoin = 'round';
         ctx.strokeText(t.text, t.x, t.y); ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
       }
@@ -902,21 +955,28 @@
     drawBanner() {
       const b = this.banner, ctx = this.ctx;
       const k = b.t / b.dur;
-      const inK = easeOut(b.t / 0.35), outK = k > 0.85 ? (k - 0.85) / 0.15 : 0;
+      const inK = easeOut(b.t / 0.4), outK = k > 0.85 ? (k - 0.85) / 0.15 : 0;
       ctx.save();
       ctx.globalAlpha = 1 - outK;
-      const y = 330;
+      const y = 320;
+      // pita gelap yang terbuka dari tengah + garis emas
       const w = W * inK;
       const g = ctx.createLinearGradient(W / 2 - w / 2, 0, W / 2 + w / 2, 0);
-      g.addColorStop(0, 'rgba(10,4,20,0)'); g.addColorStop(0.2, 'rgba(10,4,20,0.88)'); g.addColorStop(0.8, 'rgba(10,4,20,0.88)'); g.addColorStop(1, 'rgba(10,4,20,0)');
-      ctx.fillStyle = g; ctx.fillRect(W / 2 - w / 2, y - 95, w, 190);
-      ctx.fillStyle = b.color; ctx.fillRect(W / 2 - w / 2, y - 95, w, 4); ctx.fillRect(W / 2 - w / 2, y + 91, w, 4);
+      g.addColorStop(0, 'rgba(10,11,15,0)'); g.addColorStop(0.25, 'rgba(10,11,15,0.9)'); g.addColorStop(0.75, 'rgba(10,11,15,0.9)'); g.addColorStop(1, 'rgba(10,11,15,0)');
+      ctx.fillStyle = g; ctx.fillRect(W / 2 - w / 2, y - 92, w, 184);
+      const lg = ctx.createLinearGradient(W / 2 - w / 2, 0, W / 2 + w / 2, 0);
+      lg.addColorStop(0, 'rgba(210,165,75,0)'); lg.addColorStop(0.5, b.color); lg.addColorStop(1, 'rgba(210,165,75,0)');
+      ctx.fillStyle = lg; ctx.fillRect(W / 2 - w / 2, y - 92, w, 2); ctx.fillRect(W / 2 - w / 2, y + 90, w, 2);
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      if (b.title) { ctx.font = '800 34px Cinzel, Georgia, serif'; ctx.fillStyle = b.color; ctx.fillText(b.title, W / 2, y - 52); }
-      ctx.font = '900 76px Cinzel, Georgia, serif';
-      ctx.lineWidth = 10; ctx.strokeStyle = '#12051c'; ctx.strokeText(b.text, W / 2 + (1 - inK) * 200, y + 6);
-      ctx.fillStyle = '#fff7e0'; ctx.fillText(b.text, W / 2 + (1 - inK) * 200, y + 6);
-      if (b.sub) { ctx.font = '700 28px Nunito, sans-serif'; ctx.fillStyle = '#e9d5ff'; ctx.fillText(b.sub, W / 2, y + 62); }
+      const tk = easeOut((b.t - 0.12) / 0.4);
+      ctx.globalAlpha = (1 - outK) * clamp(tk * 1.4);
+      if (b.title) { ctx.font = `700 26px ${F.hud}`; ctx.fillStyle = b.color; ctx.fillText(b.title.split('').join(' '), W / 2, y - 54); }
+      ctx.font = `800 84px ${F.display}`;
+      ctx.lineWidth = 10; ctx.strokeStyle = '#0a0b0f'; ctx.lineJoin = 'round';
+      const tx = W / 2, ty = y + 6 + (1 - tk) * 18;
+      ctx.strokeText(b.text, tx, ty);
+      ctx.fillStyle = '#f0d48a'; ctx.fillText(b.text, tx, ty);
+      if (b.sub) { ctx.font = `700 26px ${F.body}`; ctx.fillStyle = '#ece3cf'; ctx.fillText(b.sub, W / 2, y + 60); }
       ctx.restore();
     }
 
@@ -1221,7 +1281,7 @@
       this.focus(e.x - 40, e.y - e.def.height * sc * 0.55, 1.32, 5);
       e.rageT = 1; this.dangerT = 0.75;
       Sfx.warn();
-      this.callout(useSkill ? SKILL_NAMES[key] : 'AWAS!', useSkill ? '#e9d5ff' : '#fca5a5', {
+      this.callout(useSkill ? SKILL_NAMES[key] : 'AWAS!', useSkill ? '#ece3cf' : '#f19b8f', {
         size: useSkill ? 104 : 96, y: H * 0.22, dur: 1.25,
         sub: `${targets.length} petualang menjadi sasaran!`,
       });
@@ -1262,7 +1322,7 @@
             a.anim.set('hit', false, () => { a.anim.set('idle', true); res(); });
             // knockback: terpental ke belakang dan sedikit terangkat
             a.ox = -rand(55, 85); a.oy = -rand(14, 26); a.rot = -0.14;
-            this.addText(a.x + rand(-20, 20), a.y - a.h - 10, `-${t.hit}`, '#f87171', 58, { stroke: '#450a0a' });
+            this.addText(a.x + rand(-20, 20), a.y - a.h - 10, `-${t.hit}`, '#f19b8f', 58, { stroke: '#450a0a' });
             this.sparks(a.x, a.y - a.h * 0.55, '255,90,90', 10, 800, Math.PI);
             this.burst(a.x, a.y - a.h * 0.5, '255,90,90', 8, 280, 6);
             this.hurt = Math.min(1, this.hurt + 0.3);
@@ -1304,7 +1364,7 @@
       if (koCount) {
         // momen dramatis saat ada yang pingsan
         this.slowMo(0.35, 700);
-        this.callout('K.O.!', '#f87171', { size: 150, y: H * 0.38, dur: 1.5, sub: `${koCount} petualang pingsan — jawab benar untuk bangkit!` });
+        this.callout('K.O.!', '#f19b8f', { size: 150, y: H * 0.38, dur: 1.5, sub: `${koCount} petualang pingsan — jawab benar untuk bangkit!` });
         Sfx.ko();
         await this.wait(450);
       }
@@ -1326,7 +1386,7 @@
       this.sparks(p.x, p.y, '255,240,200', 40, 1700, null, true);
       this.burst(p.x, p.y, '255,230,160', 40, 900, 10);
       this.shake = 34;
-      this.callout('FINISH!', '#fde047', { size: 170, dur: 1.7, sub: `${e.name} tumbang!` });
+      this.callout('FINISH!', '#f0d48a', { size: 170, dur: 1.7, sub: `${e.name} tumbang!` });
       Sfx.boom(); Sfx.crit();
       await this.wait(420);
     }
@@ -1481,7 +1541,7 @@
     }
 
     async transitionTo(next) {
-      this.showBanner('', 'MUSUH DIKALAHKAN!', '#facc15', 1800, 'Party bergerak menuju musuh berikutnya…');
+      this.showBanner('', 'MUSUH DIKALAHKAN!', '#d2a54b', 1800, 'Party bergerak menuju musuh berikutnya…');
       Sfx.stageClear();
       await this.partyCelebrate();
       const walk = this.partyWalk(2400);
@@ -1574,11 +1634,11 @@
       this.barsT = 1;
       const head = this.enemyHead();
       this.focus(e.x - 40, e.y - 140, 1.3, 2);
-      this.callout('…', '#e5e7eb', { size: 160, y: H * 0.36, dur: 1.4 });
+      this.callout('…', '#ece3cf', { size: 160, y: H * 0.36, dur: 1.4 });
       Sfx.heartbeat(); await this.wait(900);
       Sfx.heartbeat(); this.dimTarget = 0.35; await this.wait(800);
       // 2) belum berakhir: retakan lava, kamera mendekat, getaran membesar
-      this.callout('BELUM BERAKHIR!', '#fca5a5', { size: 120, y: H * 0.28, dur: 1.8 });
+      this.callout('BELUM BERAKHIR!', '#f19b8f', { size: 120, y: H * 0.28, dur: 1.8 });
       Sfx.heartbeat(); Sfx.rumble();
       e.rageT = 1; this.dangerT = 0.8;
       if (e.def.sprite && Enemies.def(e.key).sprite) e.st.pose = toLava ? 'transform' : 'defeat';
@@ -1606,11 +1666,11 @@
       this.focus(nh.x, nh.y + 80, 1.35, 5);
       this.speed = { x: nh.x, y: nh.y, color: rgb, a: 0, aT: 1 };
       this.slowMo(0.45, 900);
-      this.callout('FASE 2', '#fb923c', { size: 170, y: H * 0.3, dur: 1.8 });
+      this.callout('FASE 2', '#f08a4b', { size: 170, y: H * 0.3, dur: 1.8 });
       await this.tween(1100, (k) => { ne.scale = 0.6 + 0.4 * easeOut(k); this.shake = 26 * (1 - k) + 6; });
       await this.wait(500);
       this.speed.aT = 0;
-      this.bossCard = { t: 0, dur: 2.6, name: next.name, title: next.title, kicker: `☠  BOSS  •  FASE 2`, color: toLava ? '#ef4444' : '#fb923c' };
+      this.bossCard = { t: 0, dur: 2.6, name: next.name, title: next.title, kicker: `☠  BOSS  •  FASE 2`, color: toLava ? '#ef4444' : '#f08a4b' };
       Sfx.boom();
       await this.wait(2300);
       ne.st.pose = null; ne.rageT = 0;
@@ -1637,12 +1697,12 @@
       for (const r of res) {
         if (r.revived) {
           const a = this.actors.get(r.id);
-          if (a) { a.ko = false; a.hp = r.hp; this.addText(a.x, a.y - a.h - 30, 'BANGKIT!', '#fde68a', 34); }
+          if (a) { a.ko = false; a.hp = r.hp; this.addText(a.x, a.y - a.h - 30, 'BANGKIT!', '#f0d48a', 34); }
         }
       }
 
       if (correct.length === 0) {
-        this.callout('MELESET…', '#94a3b8', { size: 110, dur: 1.6, sub: 'Tidak ada yang menjawab benar' });
+        this.callout('MELESET…', '#9b9384', { size: 110, dur: 1.6, sub: 'Tidak ada yang menjawab benar' });
         Sfx.wrong();
         await this.wait(1000);
       } else {
@@ -1651,7 +1711,7 @@
         this.combo = { hits: 0, dmg: 0, t: 0, pop: 0 };
         this.focus(pc + 60, 720, 1.1, 6);
         Sfx.charge();
-        this.callout('SERANGAN!', '#fde68a', { size: 110, y: H * 0.26, dur: 0.95, sub: `${correct.length} petualang menjawab benar` });
+        this.callout('SERANGAN!', '#f0d48a', { size: 110, y: H * 0.26, dur: 0.95, sub: `${correct.length} petualang menjawab benar` });
         for (const r of correct) {
           const a = this.actors.get(r.id);
           a.flash = 0.6;
@@ -1674,7 +1734,7 @@
       for (const r of res) { const a = this.actors.get(r.id); if (a && r.correct) { a.hp = r.hp; a.streak = r.streak; } }
 
       if (payload.enemy.held) {
-        this.addText(e.x - 100, e.y - e.def.height * 0.9, 'Musuh masih bertahan!', '#fde68a', 40, { dur: 1.8, vy: -20 });
+        this.addText(e.x - 100, e.y - e.def.height * 0.9, 'Musuh masih bertahan!', '#f0d48a', 40, { dur: 1.8, vy: -20 });
       }
 
       // serangan balik musuh
@@ -1701,23 +1761,192 @@
       await this.wait(300);
     }
 
-    async playIntro(enemy) {
+    // ================================================================ PROLOG
+    // Narasi -> lingkaran pemanggilan -> para siswa dipanggil ke dunia lain -> judul.
+    // Guru bisa klik layar untuk melewati.
+    sw(ms) {
+      if (this.skipFlag) return Promise.resolve();
+      return new Promise((r) => { this._swr = r; this.after(ms, () => { if (this._swr === r) this._swr = null; r(); }); });
+    }
+    skip() {
+      if (!this.inPrologue) return;
+      this.skipFlag = true;
+      if (this._swr) { const r = this._swr; this._swr = null; r(); }
+    }
+
+    async playPrologue(title) {
+      this.inPrologue = true; this.skipFlag = false;
+      this.barsT = 1;
+      const actors = [...this.actors.values()];
+      actors.forEach((a) => { a.hidden = true; });
+      this.enemyBarVisible = false;
+      this.fade = 1; this.fadeTarget = 1;
+      const lines = [
+        'Dahulu, negeri Eldoria hidup dalam damai.',
+        'Hingga Raja Iblis Azaroth bangkit dari Benteng Neraka.',
+        'Dengan sisa kekuatannya, sang Penyihir Agung membuka gerbang antar-dunia…',
+        '…dan memanggil para pahlawan dari dunia lain.',
+      ];
+      // 1) narasi
+      for (const line of lines) {
+        if (this.skipFlag) break;
+        this.story = { text: line, start: this.gt, out: 0 };
+        Sfx.tick();
+        await this.sw(line.length * 32 + 1100);
+        if (this.story) this.story.out = this.gt;
+        await this.sw(420);
+      }
+      this.story = null;
+      // 2) lingkaran pemanggilan
+      const cx = this.partyCenter(), cy = 880;
+      if (!this.skipFlag) {
+        this.fadeTarget = 0;
+        this.focus(cx, 720, 1.15, 30); this.cam = { x: cx, y: 720, z: 1.15 };
+        this.summon = { x: cx, y: cy, t: 0, k: 0 };
+        Sfx.charge();
+        await this.tween(1400, (k) => { if (this.summon) this.summon.k = easeOut(k); });
+        // 3) para petualang turun lewat pilar cahaya
+        const step = Math.min(160, 2400 / Math.max(1, actors.length));
+        for (const a of actors) {
+          if (this.skipFlag) break;
+          a.hidden = false; this.spawnPillar(a);
+          this.burst(a.x, a.y - 20, '240,212,138', 8, 260, 5, { grav: -60 });
+          await this.sw(step);
+        }
+        await this.sw(500);
+        this.flash = 0.6; this.flashColor = '255,240,210';
+        Sfx.boom();
+        this.resetCam(2);
+      }
+      actors.forEach((a) => { a.hidden = false; });
+      this.fade = 0; this.fadeTarget = 0;
+      // 4) kartu judul
+      if (!this.skipFlag) {
+        this.titleCard = { start: this.gt, dur: 3.2, sub: title || '' };
+        Sfx.stageClear();
+        await this.sw(3000);
+      }
+      this.titleCard = null;
+      if (this.summon) { const sm = this.summon; this.tween(600, (k) => { sm.k = 1 - k; }).then(() => { if (this.summon === sm) this.summon = null; }); }
+      this.resetCam(2);
+      this.barsT = 0;
+      this.inPrologue = false; this.skipFlag = false;
+    }
+
+    async playIntro(enemy, title) {
+      await this.playPrologue(title);
       this.setEnemy(enemy, { entrance: true });
-      this.showBanner('', 'PETUALANGAN DIMULAI!', '#facc15', 2000, 'Kalahkan pasukan Raja Iblis dengan menjawab soal!');
+      this.showBanner('', 'Petualangan dimulai', '#d2a54b', 2000, 'Jawab soal dengan benar untuk menyerang!');
       await this.partyWalk(1800);
       await this.enemyEntrance();
     }
 
+    drawStory() {
+      const ctx = this.ctx, st = this.story;
+      if (!st) return;
+      const tt = this.gt - st.start;
+      ctx.save();
+      const a = st.out ? clamp(1 - (this.gt - st.out) / 0.4) : clamp(tt / 0.3);
+      const n = Math.min(st.text.length, Math.floor(tt * 32));
+      ctx.globalAlpha = a;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#d9622b';
+      ctx.save(); ctx.translate(W / 2, H / 2 - 70); ctx.rotate(Math.PI / 4); ctx.fillRect(-6, -6, 12, 12); ctx.restore();
+      ctx.font = `700 58px ${F.body}`;
+      // posisi tetap: ukur kalimat penuh, gambar bagian yang sudah "diketik"
+      const full = ctx.measureText(st.text).width;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ece3cf';
+      ctx.fillText(st.text.slice(0, n), W / 2 - full / 2, H / 2);
+      ctx.restore();
+      // bara api melayang
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 26; i++) {
+        const p = ((this.t * 0.05 + i * 0.137) % 1);
+        const x = (i * 211) % W + Math.sin(this.t + i) * 20, y = H - p * H;
+        ctx.fillStyle = `rgba(240,138,75,${0.5 * (1 - p)})`; ctx.fillRect(x, y, 3, 3);
+      }
+      ctx.restore();
+      ctx.save(); ctx.font = `700 20px ${F.hud}`; ctx.fillStyle = 'rgba(155,147,132,0.8)'; ctx.textAlign = 'right';
+      ctx.fillText('KLIK LAYAR UNTUK MELEWATI', W - 40, H - 36); ctx.restore();
+    }
+
+    drawSummon() {
+      const s = this.summon; if (!s || s.k <= 0.01) return;
+      const ctx = this.ctx, k = s.k, t = this.t;
+      const R = 520 * k;
+      ctx.save();
+      ctx.translate(s.x, s.y); ctx.scale(1, 0.3);
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+      g.addColorStop(0, `rgba(240,212,138,${0.35 * k})`); g.addColorStop(1, 'rgba(240,138,75,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+      ctx.strokeStyle = `rgba(240,212,138,${0.9 * k})`;
+      ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, R * 0.86, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.5, 0, TAU); ctx.stroke();
+      ctx.save(); ctx.rotate(t * 0.6);
+      ctx.beginPath();
+      for (let i = 0; i < 7; i++) {
+        const a1 = (i / 7) * TAU, a2 = a1 + (3 * TAU) / 7;
+        ctx.moveTo(Math.cos(a1) * R * 0.86, Math.sin(a1) * R * 0.86); ctx.lineTo(Math.cos(a2) * R * 0.86, Math.sin(a2) * R * 0.86);
+      }
+      ctx.stroke();
+      ctx.restore();
+      ctx.save(); ctx.rotate(-t * 0.35);
+      ctx.fillStyle = `rgba(240,138,75,${0.9 * k})`;
+      for (let i = 0; i < 36; i++) {
+        const a = (i / 36) * TAU;
+        ctx.save(); ctx.translate(Math.cos(a) * R * 0.93, Math.sin(a) * R * 0.93); ctx.rotate(a);
+        ctx.fillRect(-3, -9, 6, i % 3 ? 10 : 18);
+        ctx.restore();
+      }
+      ctx.restore();
+      ctx.restore();
+    }
+
+    drawTitleCard() {
+      const c = this.titleCard; if (!c) return;
+      c.t = this.gt - c.start;
+      const ctx = this.ctx;
+      const inK = easeOut(c.t / 0.6), out = clamp((c.t - (c.dur - 0.5)) / 0.5);
+      ctx.save();
+      ctx.globalAlpha = inK * (1 - out);
+      const g = ctx.createRadialGradient(W / 2, H * 0.42, 50, W / 2, H * 0.42, 900);
+      g.addColorStop(0, 'rgba(10,11,15,0.75)'); g.addColorStop(1, 'rgba(10,11,15,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.translate(W / 2, H * 0.42);
+      const sc = 1.12 - 0.12 * inK;
+      ctx.scale(sc, sc);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `700 34px ${F.hud}`; ctx.fillStyle = '#ece3cf';
+      ctx.fillText('P E T U A L A N G A N   M E L A W A N', 0, -150);
+      ctx.font = `800 220px ${F.display}`;
+      ctx.shadowColor = 'rgba(217,98,43,0.6)'; ctx.shadowBlur = 50;
+      ctx.lineWidth = 14; ctx.strokeStyle = '#1c1005'; ctx.lineJoin = 'round';
+      ctx.strokeText('Raja Iblis', 0, 10);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#d2a54b'; ctx.fillText('Raja Iblis', 0, 10);
+      // garis ornamen
+      const rw = 420 * inK;
+      const lg = ctx.createLinearGradient(-rw, 0, rw, 0);
+      lg.addColorStop(0, 'rgba(210,165,75,0)'); lg.addColorStop(0.5, '#d2a54b'); lg.addColorStop(1, 'rgba(210,165,75,0)');
+      ctx.fillStyle = lg; ctx.fillRect(-rw, 140, rw * 2, 2);
+      ctx.save(); ctx.translate(0, 141); ctx.rotate(Math.PI / 4); ctx.fillStyle = '#d9622b'; ctx.fillRect(-8, -8, 16, 16); ctx.restore();
+      if (c.sub) { ctx.font = `700 40px ${F.body}`; ctx.fillStyle = '#ece3cf'; ctx.fillText(c.sub, 0, 200); }
+      ctx.restore();
+    }
+
     async playVictory() {
       Sfx.victory();
-      this.showBanner('', 'KEMENANGAN!', '#facc15', 3500, 'Raja Iblis telah dikalahkan. Dunia kembali damai!');
+      this.showBanner('', 'KEMENANGAN!', '#d2a54b', 3500, 'Raja Iblis telah dikalahkan. Dunia kembali damai!');
       for (let i = 0; i < 6; i++) { this.burst(rand(300, 1600), rand(200, 500), ['255,220,100', '140,255,180', '200,150,255'][i % 3], 50, 700, 9); await this.wait(350); }
       await this.partyCelebrate();
     }
 
     async playDefeat() {
       Sfx.defeat();
-      this.showBanner('', 'PARTY MUNDUR…', '#f87171', 3500, 'Raja Iblis masih berkuasa. Latih lagi dan coba kembali!');
+      this.showBanner('', 'PARTY MUNDUR…', '#f19b8f', 3500, 'Raja Iblis masih berkuasa. Latih lagi dan coba kembali!');
       await this.wait(1500);
     }
   }

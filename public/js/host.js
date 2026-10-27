@@ -29,9 +29,11 @@
   }
   window.addEventListener('resize', fit);
 
-  function toast(msg, ms = 2500) {
+  function toast(msg, ms = 2500, color = null) {
     const t = $('#toast');
-    t.textContent = msg; t.hidden = false;
+    t.innerHTML = msg;
+    t.style.setProperty('--c', color || 'var(--gold)');
+    t.hidden = true; void t.offsetWidth; t.hidden = false;   // ulang animasi masuk
     clearTimeout(t._h); t._h = setTimeout(() => { t.hidden = true; }, ms);
   }
 
@@ -71,8 +73,11 @@
     $('#setup').hidden = true;
     $('#game').hidden = false;
     fit();
-    if (!battle) battle = new Battle($('#cv'));
-    battle.onCinema = (on) => document.body.classList.toggle('cinema', on);
+    if (!battle) {
+      battle = new Battle($('#cv'));
+      battle.onCinema = (on) => document.body.classList.toggle('cinema', on);
+      $('#stage').addEventListener('click', () => battle.skip());
+    }
     // muat semua sprite di awal
     GameData.CHARACTERS.forEach((c) => Sprites.load(c.id));
     room = snapshot;
@@ -82,7 +87,7 @@
     $('#room-code').textContent = snapshot.code;
     $('#code-mini').textContent = snapshot.code;
     $('#join-url').textContent = joinUrl.replace(/^https?:\/\//, '');
-    $('#lobby-kicker').textContent = snapshot.title || 'Ruang Petualangan';
+    $('#lobby-kicker').textContent = snapshot.title || 'Pindai untuk bergabung';
     $('#controls').hidden = false;
     battle.stage = 1; battle.phase = 1;
     battle.setParty(snapshot.players);
@@ -107,20 +112,36 @@
     $('#lobby').hidden = !on;
   }
 
+  // Daftar party: 20 slot, slot terisi menampilkan potret karakter.
+  const seenIds = new Set();
   function renderLobby() {
     if (!room) return;
     const ps = room.players;
     $('#party-count').textContent = ps.length;
     $('#btn-start').disabled = ps.length === 0;
-    $('#party-list').innerHTML = ps.map((p) => {
+    const slots = ps.map((p) => {
       const c = CHARS[p.charId];
-      return `<button class="party-chip${p.connected ? '' : ' off'}" data-id="${p.id}" style="--c:${c.color}">
-        <span class="dot"></span>${escapeHtml(p.name)}<small>${c.name}</small></button>`;
-    }).join('') || '<p class="hint">Menunggu petualang pertama…</p>';
+      const fresh = !seenIds.has(p.id);
+      seenIds.add(p.id);
+      return `<button class="slot filled${p.connected ? '' : ' off'}${fresh ? ' new just' : ''}" data-id="${p.id}" style="--c:${c.color}">
+        <canvas width="128" height="144" data-char="${c.id}"></canvas>
+        <span class="nm">${escapeHtml(p.name)}<small>${c.name}</small></span></button>`;
+    });
+    for (let i = ps.length; i < GameData.MAX_PLAYERS; i++) slots.push(`<div class="slot empty">${i === ps.length ? 'menunggu…' : ''}</div>`);
+    $('#party-list').innerHTML = slots.join('');
+    $('#party-list').querySelectorAll('canvas').forEach(drawPortrait);
+  }
+
+  async function drawPortrait(cv) {
+    const sheet = await Sprites.load(cv.dataset.char);
+    if (!sheet || !sheet.img) return;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    Sprites.draw(ctx, sheet, 'idle', 0, cv.width / 2, cv.height + 96, 230);
   }
 
   $('#party-list').addEventListener('click', (e) => {
-    const b = e.target.closest('.party-chip'); if (!b) return;
+    const b = e.target.closest('.slot.filled'); if (!b) return;
     const p = room.players.find((x) => x.id === b.dataset.id);
     if (p && confirm(`Keluarkan ${p.name} dari party?`)) socket.emit('host:kick', { playerId: p.id });
   });
@@ -134,7 +155,7 @@
       $('#corner').hidden = false;
       battle.enemyBarVisible = true;
       animating = true;
-      await battle.playIntro(room.enemy);
+      await battle.playIntro(room.enemy, room.title);
       animating = false;
       flushSnapshot();
       nextQuestion();
@@ -160,9 +181,12 @@
     $('#q-text').textContent = q.q;
     $('#q-options').innerHTML = q.options.map((o, k) => `
       <div class="q-option opt-${k}" data-k="${k}">
-        <span class="shape">${SHAPES[k]}</span><b>${LETTERS[k]}</b><span class="txt">${escapeHtml(o)}</span>
+        <span class="seal">${LETTERS[k]}<small>${SHAPES[k]}</small></span><span class="txt">${escapeHtml(o)}</span>
         <span class="count"></span><span class="bar"></span>
       </div>`).join('');
+    // ulang animasi masuk panel untuk setiap soal baru
+    panel.style.animation = 'none'; void panel.offsetWidth; panel.style.animation = '';
+    $('#q-text').style.animation = 'none'; void panel.offsetWidth; $('#q-text').style.animation = '';
     $('#btn-skip').hidden = false;
     $('#btn-next').hidden = true;
     $('#leader').hidden = true;
@@ -189,7 +213,7 @@
 
   function updateAnswered(n) {
     const total = room ? room.players.filter((p) => p.connected).length : 0;
-    $('#q-answered-box').textContent = `${n}/${total} menjawab`;
+    $('#q-answered-box').innerHTML = `<b>${n}</b> / ${total} menjawab`;
   }
 
   socket.on('question:start', (q) => startQuestion(q));
@@ -215,7 +239,7 @@
       el.querySelector('.bar').style.width = (100 * payload.counts[k]) / total + '%';
     });
     const nCorrect = payload.results.filter((r) => r.correct).length;
-    $('#q-answered-box').textContent = `✔ ${nCorrect} dari ${payload.results.length} benar`;
+    $('#q-answered-box').innerHTML = `<b>${nCorrect}</b> dari ${payload.results.length} benar`;
     Sfx[nCorrect > 0 ? 'correct' : 'wrong']();
     await sleep(2200);
     panel.classList.add('collapsed');
@@ -237,23 +261,24 @@
     $('#btn-skip').hidden = true;
     if (autoNext) {
       let n = 6;
-      const upd = () => { $('#btn-next').textContent = `▶ Soal berikutnya (${n})`; };
+      const upd = () => { $('#btn-next span').textContent = `Soal berikutnya · ${n}`; };
       upd();
       clearInterval(autoTimer);
       autoTimer = setInterval(() => { n--; upd(); if (n <= 0) { clearInterval(autoTimer); nextQuestion(); } }, 1000);
-    } else $('#btn-next').textContent = '▶ Soal berikutnya';
+    } else $('#btn-next span').textContent = 'Soal berikutnya';
   }
 
   $('#btn-auto').onclick = () => {
     autoNext = !autoNext;
-    $('#btn-auto').textContent = `Auto: ${autoNext ? 'Nyala' : 'Mati'}`;
+    $('#btn-auto span').textContent = autoNext ? 'Auto · nyala' : 'Auto';
     $('#btn-auto').classList.toggle('on', autoNext);
     if (!$('#btn-next').hidden) { clearInterval(autoTimer); showNextButton(); }
   };
 
   function showLeader(lb) {
     if (!lb || !lb.length) return;
-    $('#leader-list').innerHTML = lb.map((p) => `<li style="--c:${CHARS[p.charId].color}"><span class="rk">${p.rank}</span><span class="nm">${escapeHtml(p.name)}</span><b>${p.score}</b>${p.streak >= 2 ? `<span class="st">🔥${p.streak}</span>` : ''}</li>`).join('');
+    $('#leader-list').innerHTML = lb.map((p) => `<li style="--c:${CHARS[p.charId].color}"><span class="rk">${p.rank}</span><span class="bar-c"></span><span class="nm">${escapeHtml(p.name)}</span>${p.streak >= 2 ? `<span class="st">${Icon.flame}${p.streak}</span>` : ''}<span class="sc">${p.score}</span></li>`).join('');
+    const ld = $('#leader'); ld.hidden = true; void ld.offsetWidth;
     $('#leader').hidden = false;
   }
 
@@ -272,7 +297,7 @@
     if (snap.state === 'question' && !$('#qpanel').classList.contains('reveal')) updateAnswered(snap.answered.length);
   }
   socket.on('player:joined', ({ player, rejoined }) => {
-    if (!rejoined) toast(`✨ ${player.name} bergabung sebagai ${CHARS[player.charId].name}!`);
+    if (!rejoined) toast(`<b>${escapeHtml(player.name)}</b> bergabung sebagai ${CHARS[player.charId].name}`, 2500, CHARS[player.charId].color);
   });
 
   // ---------------------------------------------------------- hasil akhir
@@ -285,8 +310,9 @@
     $('#leader').hidden = true;
     $('#btn-next').hidden = true; $('#btn-skip').hidden = true;
     $('#corner').hidden = true; $('#controls').hidden = true;
+    if (battle) battle.enemyBarVisible = false;
     clearInterval(autoTimer);
-    $('#final-title').textContent = victory ? '🏆 KEMENANGAN! 🏆' : 'Party Mundur…';
+    $('#final-title').textContent = victory ? 'Kemenangan' : 'Party Mundur';
     $('#final').classList.toggle('lose', !victory);
     $('#final-sub').textContent = victory
       ? 'Raja Iblis Azaroth berhasil dikalahkan! Inilah para pahlawan hari ini:'
@@ -297,7 +323,7 @@
       const p = top[i];
       return `<div class="pod pod-${i + 1}" style="--c:${CHARS[p.charId].color}">
         <canvas width="260" height="300" data-char="${p.charId}"></canvas>
-        <div class="pod-name">${escapeHtml(p.name)}</div><div class="pod-score">${p.score} poin</div>
+        <div class="pod-name">${escapeHtml(p.name)}</div><div class="pod-score">${p.score} POIN</div>
         <div class="pod-block">${i + 1}</div></div>`;
     }).join('');
     $('#podium').querySelectorAll('canvas').forEach(drawPodiumChar);
@@ -348,8 +374,8 @@
   $('#btn-quit').onclick = () => {
     if (confirm('Akhiri permainan dan tutup ruang? Semua siswa akan keluar.')) socket.emit('host:close', {}, resetToSetup);
   };
-  $('#btn-mute').onclick = () => { Sfx.setMuted(!Sfx.muted); $('#btn-mute').textContent = Sfx.muted ? '🔇' : '🔊'; };
-  $('#btn-mute').textContent = Sfx.muted ? '🔇' : '🔊';
+  $('#btn-mute').onclick = () => { Sfx.setMuted(!Sfx.muted); $('#btn-mute').innerHTML = Sfx.muted ? Icon.mute : Icon.sound; };
+  $('#btn-mute').innerHTML = Sfx.muted ? Icon.mute : Icon.sound;
   $('#btn-full').onclick = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else document.documentElement.requestFullscreen().catch(() => {});
