@@ -1055,7 +1055,7 @@
       anim.set('ultimate', false);
       const rgb = hexToRgb(ch.color);
       this.spot = { charId: ch.id, anim, x: 560, y: 960, h: 420, t: performance.now(), colorRgba: `rgba(${rgb},0.9)` };
-      this.showBanner(`⚡ ULTIMATE — ${a.name} ⚡`, ch.ultimateName, ch.color, 2600);
+      this.showBanner(`ULTIMATE · ${a.name}`, ch.ultimateName, ch.color, 2600);
       const n = sheet ? Sprites.frameCount(sheet, 'ultimate') : 4;
       const animMs = Math.min(1500, Math.max(1000, (n / ch.fps.ultimate) * 1000));
       for (let i = 0; i < 8; i++) this.burst(560, 760, rgb, 6, 300, 8, { grav: -50 });
@@ -1612,7 +1612,7 @@
       await this.wait(1000);
       // 5) kartu nama
       this.speed.aT = 0;
-      this.bossCard = { t: 0, dur: 2.8, name: next.name, title: next.title, kicker: `☠  BOSS  •  STAGE ${next.stage}`, color };
+      this.bossCard = { t: 0, dur: 2.8, name: next.name, title: next.title, kicker: `BOSS  ·  STAGE ${next.stage}`, color };
       Sfx.boom();
       await this.wait(2400);
       e.st.pose = null;
@@ -1670,7 +1670,7 @@
       await this.tween(1100, (k) => { ne.scale = 0.6 + 0.4 * easeOut(k); this.shake = 26 * (1 - k) + 6; });
       await this.wait(500);
       this.speed.aT = 0;
-      this.bossCard = { t: 0, dur: 2.6, name: next.name, title: next.title, kicker: `☠  BOSS  •  FASE 2`, color: toLava ? '#ef4444' : '#f08a4b' };
+      this.bossCard = { t: 0, dur: 2.6, name: next.name, title: next.title, kicker: `BOSS  ·  FASE 2`, color: toLava ? '#ef4444' : '#f08a4b' };
       Sfx.boom();
       await this.wait(2300);
       ne.st.pose = null; ne.rageT = 0;
