@@ -111,10 +111,12 @@ public/host.html          Layar guru (editor soal, lobby QR, pertarungan, hasil)
 public/play.html          Kontroler HP siswa (nama, pilih karakter, tombol A–D)
 public/js/battle.js       Mesin animasi pertarungan (canvas 1920×1080)
 public/js/enemies.js      Musuh prosedural beranimasi (termasuk Raja Iblis fase 1 & 2)
-public/js/backgrounds.js  Latar tiap stage (hutan, makam, gunung api, istana iblis)
+public/js/backgrounds.js  Latar tiap stage (gambar lukisan bila ada, selain itu prosedural)
+public/assets/backgrounds Latar gambar hasil tools/prepare_backgrounds.py
 public/assets/characters  Atlas sprite karakter (hasil potong sprite sheet)
 assets-src/sheets         Sprite sheet asli karakter
 tools/slice_sprites.py    Pemotong sprite sheet → atlas WebP transparan + JSON
+tools/prepare_backgrounds.py  Pemotong lembar latar (latar belakang + latar depan transparan)
 tools/bots.js             Simulasi siswa untuk uji coba
 test/                     Uji logika permainan (`npm test`)
 ```
@@ -130,3 +132,14 @@ python3 tools/slice_sprites.py --debug   # lembar kontrol tersimpan di tools/_de
 ```
 
 Data karakter (nama, skill, kecepatan animasi) ada di `public/js/shared/characters.js`.
+
+## Mengganti / menambah latar stage
+
+Lembar latar (panel atas = latar belakang, panel bawah = latar depan dengan pola papan catur)
+disimpan di `assets-src/backgrounds/`. Daftarkan di `CONFIG` pada `tools/prepare_backgrounds.py`
+(koordinat kedua panel), jalankan `python3 tools/prepare_backgrounds.py --debug`, lalu tambahkan
+entrinya di `IMAGE_STAGES` pada `public/js/backgrounds.js` (kunci `"stage:fase"`, mis. `'2:1'`,
+`'4:2'` untuk Raja Iblis fase 2). Latar depan digambar di depan karakter dan bergeser lebih cepat
+saat party berjalan (efek parallax). Stage yang belum punya gambar tetap memakai latar prosedural.
+
+Saat ini: Stage 1 (Lembah Berkabut) memakai gambar; Stage 2–4 masih prosedural.

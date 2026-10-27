@@ -232,6 +232,24 @@
     },
   };
 
+  // Latar dari gambar (tools/prepare_backgrounds.py). Kunci: "stage:fase".
+  // Stage tanpa gambar memakai latar prosedural di atas.
+  const IMAGE_STAGES = {
+    '1:1': { bg: '/assets/backgrounds/stage1_bg.webp', fg: '/assets/backgrounds/stage1_fg.webp', fgY: 70, particles: 'fog' },
+  };
+  const images = {};
+  function img(src) {
+    if (!images[src]) {
+      const im = new Image();
+      im.src = src;
+      images[src] = im;
+    }
+    const im = images[src];
+    return im.complete && im.naturalWidth ? im : null;
+  }
+  Object.values(IMAGE_STAGES).forEach((c) => { img(c.bg); if (c.fg) img(c.fg); });
+  function imageStage(stage, phase) { return IMAGE_STAGES[stage + ':' + (stage === 4 ? phase : 1)]; }
+
   const STAGE_THEME = { 1: 'forest', 2: 'graveyard', 3: 'volcano', 4: 'castle' };
   const cache = {};
 
@@ -283,6 +301,15 @@
 
   // scroll: jarak jalan party (px). flash: kilat (0..1) untuk fase 2
   function draw(ctx, stage, phase, t, scroll = 0, flash = 0) {
+    const im = imageStage(stage, phase);
+    const bgImg = im && img(im.bg);
+    if (bgImg) {
+      // gambar 10% lebih lebar agar bisa digeser saat party berjalan
+      const pan = Math.min(W * 0.1, scroll * 0.2);
+      ctx.drawImage(bgImg, -pan, -H * 0.05, W * 1.1, H * 1.1);
+      particles(ctx, im.particles, t);
+      return;
+    }
     const th = get(stage, phase);
     ctx.drawImage(th.sky, 0, 0);
     drawLayer(ctx, th.far, scroll * 0.15);
@@ -295,5 +322,14 @@
     }
   }
 
-  window.Backgrounds = { draw, W, H, GROUND, preload: get };
+  // Latar depan (batu/tanaman) di depan karakter. Digeser lebih cepat (parallax).
+  function drawFront(ctx, stage, phase, scroll = 0) {
+    const im = imageStage(stage, phase);
+    const fgImg = im && im.fg && img(im.fg);
+    if (!fgImg) return;
+    const pan = Math.min(W * 0.1, scroll * 0.4);
+    ctx.drawImage(fgImg, -pan, im.fgY || 0, W * 1.1, H * 1.1);
+  }
+
+  window.Backgrounds = { draw, drawFront, W, H, GROUND, preload: get };
 })();

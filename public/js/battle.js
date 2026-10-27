@@ -77,7 +77,7 @@
       const n = list.length;
       const rows = n <= 5 ? 1 : n <= 10 ? 2 : n <= 15 ? 3 : 4;
       const baseH = [0, 250, 215, 188, 168][rows];
-      const ys = { 1: [870], 2: [770, 945], 3: [705, 835, 970], 4: [665, 775, 885, 995] }[rows];
+      const ys = { 1: [860], 2: [775, 925], 3: [700, 815, 930], 4: [650, 752, 855, 958] }[rows];
       list.forEach((a, i) => {
         const row = rows - 1 - (i % rows); // isi baris depan (bawah) dulu
         const col = Math.floor(i / rows);
@@ -326,6 +326,7 @@
       for (const a of drawList) this.drawActorShadow(a);
       if (this.enemy) this.drawEnemy();
       for (const a of drawList) this.drawActor(a);
+      Backgrounds.drawFront(ctx, this.stage, this.phase, this.scroll);
       if (this.barrier > 0.01) this.drawBarrier();
       this.fx.filter((f) => f.layer === 'front').forEach((f) => f.draw(ctx));
       this.drawParticles();
