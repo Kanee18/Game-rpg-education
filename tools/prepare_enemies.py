@@ -33,21 +33,23 @@ CONFIG = {
     # kotak diskalakan otomatis bila lembar sumber beresolusi lain.
     "lavaknight": {
         "file": "stage3-boss.jpg",
-        "ref": (768, 1024),
+        "ref": (765, 1024),
+        "hole_min": 20,         # latar putih: celah kecil di sela kaki/pedang ikut dibuang
         "flip": True,
         "target_h": 360,
         "frames": {
-            "idle": (50, 36, 195, 262),
-            "idle2": (285, 36, 510, 262),
-            "windup": (525, 36, 735, 262),
-            "attack": {"from": (12, 288, 268, 508), "glow_near_body": 40},
-            "defeat": (272, 326, 484, 508),
-            "transform": (515, 288, 740, 508),
+            "idle": (52, 74, 180, 259),
+            "idle2": (316, 80, 504, 259),
+            "windup": (523, 74, 708, 259),
+            "attack": {"from": (12, 306, 260, 481), "glow_near_body": 40},
+            "defeat": (272, 336, 464, 481),
+            "transform": (528, 288, 734, 479),
         },
     },
     "hellfire": {
         "file": "stage3-boss.jpg",
-        "ref": (768, 1024),
+        "ref": (765, 1024),
+        "hole_min": 20,
         "flip": True,
         "target_h": 430,
         "frames": {
@@ -92,7 +94,7 @@ CONFIG = {
 }
 
 
-def extract(rgb, thin_glow=False):
+def extract(rgb, thin_glow=False, hole_min=120):
     rgbf = rgb.astype(float)
     mn, mx = rgb.min(2), rgb.max(2)
     dark = mx < 95
@@ -107,7 +109,7 @@ def extract(rgb, thin_glow=False):
     lab_h, n_h = ndi.label(hole)
     if n_h:
         sizes_h = np.bincount(lab_h.ravel())
-        big = sizes_h > 120
+        big = sizes_h > hole_min
         big[0] = False
         body &= ~big[lab_h]
     body = ndi.binary_opening(body, iterations=1) | dark
@@ -181,7 +183,7 @@ def process(eid, cfg, debug):
     for name, spec in cfg["frames"].items():
         box = spec["from"] if isinstance(spec, dict) else spec
         rgb = np.asarray(sheet.crop(box)).astype(np.int16)
-        col, al, body = extract(rgb, thin_glow=name in cfg.get("thin_glow", ()))
+        col, al, body = extract(rgb, thin_glow=name in cfg.get("thin_glow", ()), hole_min=cfg.get("hole_min", 120))
         if isinstance(spec, dict) and spec.get("cut_below"):
             body[spec["cut_below"]:] = False
             al[spec["cut_below"]:] = 0

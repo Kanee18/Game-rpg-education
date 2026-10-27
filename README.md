@@ -146,8 +146,8 @@ entrinya di `IMAGE_STAGES` pada `public/js/backgrounds.js` (kunci `"stage:fase"`
 `'4:2'` untuk Raja Iblis fase 2). Latar depan digambar di depan karakter dan bergeser lebih cepat
 saat party berjalan (efek parallax). Stage yang belum punya gambar tetap memakai latar prosedural.
 
-Saat ini: Stage 1 (Lembah Berkabut) dan Stage 2 (Gua Kristal) memakai gambar. Stage 3 sudah disiapkan:
-simpan `assets-src/backgrounds/stage3-benteng-bg.jpg` dan `stage3-benteng-fg.jpg` lalu jalankan skripnya.
+Saat ini: Stage 1 (Lembah Berkabut), Stage 2 (Gua Kristal), dan Stage 3 (Benteng Neraka) memakai gambar;
+Stage 4 masih prosedural.
 Lembar latar boleh juga berupa dua file terpisah (`bg_file`, `fg_file`) seperti Stage 2.
 
 ## Mengganti / menambah sprite musuh
@@ -157,6 +157,6 @@ Daftarkan kotak tiap pose di `CONFIG` pada `tools/prepare_enemies.py`, lalu jala
 `python3 tools/prepare_enemies.py --debug`. Hasilnya `public/assets/enemies/<id>.webp/.json`.
 Saat ini Stage 1 memakai Serigala Kristal Bayangan (`wolf`) dan Stage 2 Golem Kristal Purba (`golem`).
 Boss Stage 3 (`lavaknight` + `hellfire`) dipotong dari `assets-src/enemies/stage3-boss.jpg` (satu lembar,
-koordinat relatif terhadap 768×1024); selama file belum ada, boss memakai gambar cadangan.
+koordinat relatif terhadap 765×1024).
 musuh lain masih digambar dengan kode. Bila lembar tidak punya pose idle, pose idle bisa dibuat dari
 pose lain (lihat konfigurasi `golem`).

@@ -91,6 +91,19 @@ def remove_checker(rgb):
             break
         bg |= nb
     bg = ndi.binary_propagation(bg, mask=bg | light_sq)
+    # Kotak catur yang ikut terkena bayangan (abu ~160 & putih ~225) dan terkurung di sela
+    # pagar/duri: wilayah netral yang berisi dua tingkat kecerahan sekaligus.
+    neutral = (chroma < 16) & (mn > 140) & ~bg
+    lab3, n3 = ndi.label(neutral)
+    if n3:
+        idx = np.arange(1, n3 + 1)
+        size3 = ndi.sum(np.ones_like(mn), lab3, idx)
+        hi = ndi.mean((mn > 205).astype(float), lab3, idx)
+        mid = ndi.mean(((mn > 140) & (mn < 200)).astype(float), lab3, idx)
+        chk = np.zeros(n3 + 1, bool)
+        chk[1:] = ((size3 > 150) & (hi > 0.2) & (mid > 0.2)) | ((size3 > 20) & (hi > 0.85))  # + potongan putih kecil
+        bg |= chk[lab3]
+        bg |= ndi.binary_dilation(chk[lab3], iterations=1) & (chroma < 20) & (mn > 135)
     # Buang pulau kecil yang tersisa di bagian atas (bayangan samar)
     fgm = ~bg
     lab2, n2 = ndi.label(fgm)

@@ -666,7 +666,7 @@
       ctx.restore();
       if (e.dying >= 0 && e.dying < 0.9 && Math.random() < 0.8) {
         const p = this.enemyHead();
-        this.emit(p.x + rand(-150, 150), p.y + rand(-250, 250), e.def.color === '#fb923c' ? '255,120,40' : '170,90,255', rand(6, 14), 0, -rand(60, 200), 1.0);
+        this.emit(p.x + rand(-150, 150), p.y + rand(-250, 250), hexToRgb(e.def.color), rand(6, 14), 0, -rand(60, 200), 1.0);
       }
     }
 
