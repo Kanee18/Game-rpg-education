@@ -8,6 +8,9 @@
   const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
   const ease = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
   const easeOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+  const easeIn = (x) => { x = clamp(x); return x * x * x; };
+  const MELEE = new Set(['ksatria', 'paladin', 'assassin']);
+  const TRAIL_COL = { slash: '255,210,90', fireball: '255,140,40', orb: '255,90,30', holy: '255,240,170', arrow: '140,255,170', dagger: '200,130,255', shockwave: '130,190,255', claw: '200,140,255', shard: '200,140,255', rock: '170,170,200', blob: '170,90,255', boneSlash: '110,200,255' };
   const rand = (a, b) => a + Math.random() * (b - a);
   const glow = (ctx, x, y, r, color, a = 1) => Enemies.glow(ctx, x, y, r, color, a);
 
@@ -33,6 +36,20 @@
       this.barrier = 0;
       this.enemyBarVisible = true;
       this.lightning = 0;
+      // --- sinematik
+      this.gt = 0;                       // jam game (ikut hit-stop & slow-motion)
+      this.timers = []; this.tweens = [];
+      this.hitstop = 0; this.slowT = 0; this.slowScale = 1;
+      this.cam = { x: W / 2, y: H / 2, z: 1 };
+      this.camT = { x: W / 2, y: H / 2, z: 1, rate: 4 };
+      this.kick = { x: 0, y: 0 };
+      this.bars = 0; this.barsT = 0;     // cinema bar atas-bawah
+      this.speed = null;                 // speed lines { x, y, color, a, aT }
+      this.hurt = 0;                     // vignette merah saat party terluka
+      this.danger = 0; this.dangerT = 0; // vignette berdenyut saat musuh bersiap
+      this.impact = 0;                   // impact frame (warna terbalik)
+      this.combo = null;
+      this.callouts = [];                // teks besar layar (FINISH!, K.O.!)
       this.last = performance.now();
       const loop = (now) => {
         const dt = Math.min(0.05, (now - this.last) / 1000);
@@ -44,7 +61,22 @@
       requestAnimationFrame(loop);
     }
 
-    wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
+    // Semua jeda & tween memakai jam game, sehingga hit-stop/slow-motion
+    // memperlambat seluruh adegan secara serempak.
+    wait(ms) { return new Promise((r) => this.timers.push({ at: this.gt + ms / 1000, fn: r })); }
+    after(ms, fn) { this.timers.push({ at: this.gt + ms / 1000, fn }); }
+    hitStop(ms) { this.hitstop = Math.max(this.hitstop, ms / 1000); }
+    slowMo(scale, ms) { this.slowScale = scale; this.slowT = Math.max(this.slowT, ms / 1000); }
+    focus(x, y, z = 1, rate = 4) { this.camT = { x, y, z, rate }; }
+    resetCam(rate = 3) { this.focus(W / 2, H / 2, 1, rate); }
+    impactFrame(ms = 90) { this.impact = Math.max(this.impact, ms / 1000); }
+    callout(text, color = '#fde68a', opts = {}) {
+      this.callouts.push({ text, color, t: 0, dur: opts.dur || 1.3, size: opts.size || 150, y: opts.y || H * 0.42, sub: opts.sub || '' });
+    }
+    partyCenter() {
+      const xs = [...this.actors.values()].map((a) => a.tx);
+      return xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 700;
+    }
 
     // ------------------------------------------------------------ party
     setParty(players) {
@@ -141,13 +173,8 @@
 
     tween(ms, fn) {
       return new Promise((res) => {
-        const start = performance.now();
-        const step = () => {
-          const k = clamp((performance.now() - start) / ms);
-          fn(k);
-          if (k < 1) requestAnimationFrame(step); else res();
-        };
-        step();
+        fn(0);
+        this.tweens.push({ start: this.gt, dur: Math.max(0.001, ms / 1000), fn, res });
       });
     }
 
@@ -170,23 +197,70 @@
       }
     }
 
+    sparks(x, y, color, n = 14, speed = 900, dir = null, top = false) {
+      for (let i = 0; i < n; i++) {
+        const a = dir == null ? rand(0, TAU) : dir + rand(-0.9, 0.9), sp = rand(speed * 0.35, speed);
+        this.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: rand(0.18, 0.4), size: rand(4, 9), color, grav: 600, streak: true, top });
+      }
+    }
+
+    // goresan tebasan yang membekas sebentar di titik hantam
+    slashMark(x, y, color = '255,255,255', size = 130, ang = rand(-0.9, -0.3)) {
+      this.fx.push({
+        t: 0, dur: 0.35, layer: 'top',
+        draw(ctx) {
+          const k = this.t / this.dur;
+          const grow = easeOut(Math.min(1, k * 4));
+          ctx.save(); ctx.globalCompositeOperation = 'lighter';
+          ctx.translate(x, y); ctx.rotate(ang);
+          ctx.fillStyle = `rgba(${color},${1 - k})`;
+          ctx.beginPath();
+          ctx.moveTo(-size * grow, 0); ctx.quadraticCurveTo(0, -10 * (1 - k) - 4, size * grow, 0); ctx.quadraticCurveTo(0, 10 * (1 - k) + 4, -size * grow, 0);
+          ctx.fill();
+          ctx.fillStyle = `rgba(255,255,255,${1 - k})`;
+          ctx.fillRect(-size * grow * 0.7, -1.5, size * grow * 1.4, 3);
+          ctx.restore();
+        },
+      });
+    }
+
     emit(x, y, color, size = 8, vx = 0, vy = 0, life = 0.5, grav = 0) {
       this.particles.push({ x, y, vx: vx + rand(-40, 40), vy: vy + rand(-40, 40), life: 0, max: life, size, color, grav, add: true });
     }
 
     hitEnemy(dmg, opts = {}) {
       const e = this.enemy; if (!e) return;
+      const big = !!opts.big;
+      const crit = !big && (opts.ult || dmg >= 112);   // jawaban sangat cepat / ultimate tanpa sorotan
       e.hitT = 1;
-      e.ox = opts.big ? 40 : 18;
+      e.ox = big ? 70 : crit ? 40 : 24;            // knockback ke belakang
+      e.squash = big ? 1 : 0.6;
       const p = this.enemyHead();
+      const hx = p.x + rand(-60, 40), hy = p.y + rand(-80, 70);
       const col = opts.color || '255,220,120';
-      this.burst(p.x + rand(-40, 40), p.y + rand(-60, 60), col, opts.big ? 40 : 14, opts.big ? 700 : 380, opts.big ? 10 : 6);
+      this.burst(hx, hy, col, big ? 40 : 10, big ? 700 : 340, big ? 10 : 6);
+      this.sparks(hx, hy, col, big ? 30 : crit ? 18 : 9, big ? 1500 : 1000, null, big);
+      if (!opts.noMark) this.slashMark(hx, hy, col, big ? 260 : crit ? 170 : 110);
       if (dmg != null) {
-        this.addText(p.x + rand(-150, 110), p.y + rand(-220, 60), String(dmg), opts.big ? '#ffd23f' : '#ffffff', opts.big ? 92 : 50, { vy: -90 });
+        // angka damage disebar ke slot melingkar agar tidak saling menumpuk
+        const SLOTS = [[-190, -210], [70, -260], [-60, -110], [140, -150], [-230, -40], [10, -330], [170, -30], [-120, -300], [40, -40], [-280, -160]];
+        this.dmgSlot = ((this.dmgSlot || 0) + 1) % SLOTS.length;
+        const [ox, oy] = SLOTS[this.dmgSlot];
+        const tx = p.x + ox + rand(-15, 15), ty = p.y + oy + rand(-10, 10);
+        if (crit) this.addText(tx, ty - 58, opts.ult ? 'ULTIMATE!' : 'KRITIS!', opts.ult ? '#c4b5fd' : '#fb923c', 34, { vy: -60, dur: 1.1 });
+        this.addText(tx, ty, String(dmg), big ? '#ffd23f' : crit ? '#fde047' : '#ffffff', big ? 110 : crit ? 72 : 50, { vy: -90, stroke: crit || big ? '#7c2d12' : '#1a0b12' });
+        if (this.combo) { this.combo.hits++; this.combo.dmg += dmg; this.combo.pop = 1; this.combo.t = 0; }
       }
       if (opts.hpDrop) e.shownHp = Math.max(0, e.shownHp - opts.hpDrop);
-      this.shake = Math.max(this.shake, opts.big ? 22 : 6);
+      this.shake = Math.max(this.shake, big ? 30 : crit ? 14 : 7);
+      this.kick.x += big ? 26 : crit ? 12 : 5;
+      // hit-stop: pukulan pertama, kritis, dan setiap pukulan ke-4 (agar tetap cepat untuk 20 siswa)
+      const n = this.combo ? this.combo.hits : 0;
+      if (big) this.hitStop(150);
+      else if (crit) this.hitStop(75);
+      else if (n <= 1 || n % 4 === 0) this.hitStop(45);
       Sfx.impact();
+      if (crit || big) Sfx.crit();
     }
 
     // ------------------------------------------------------------ proyektil
@@ -201,6 +275,8 @@
         },
         update(dt) {
           const p = this.pos();
+          (this.trail = this.trail || []).push({ x: p.x, y: p.y });
+          if (this.trail.length > 12) this.trail.shift();
           if (type === 'fireball' || type === 'orb') self.emit(p.x, p.y, type === 'orb' ? '255,120,40' : '255,140,40', 10, -120, rand(-30, 30), 0.35);
           if (type === 'holy') self.emit(p.x, p.y, '255,240,170', 6, rand(-80, 80), rand(-80, 80), 0.4);
           if (type === 'dagger') self.emit(p.x, p.y, '190,120,255', 5, -60, 0, 0.25);
@@ -212,6 +288,19 @@
           return !this.done;
         },
         draw(ctx) {
+          // ekor cahaya meruncing di belakang proyektil
+          const tr = this.trail;
+          if (tr && tr.length > 2) {
+            const col = TRAIL_COL[type] || '255,255,255';
+            ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+            for (let i = 1; i < tr.length; i++) {
+              const k = i / tr.length;
+              ctx.strokeStyle = `rgba(${col},${0.55 * k})`;
+              ctx.lineWidth = 2 + 16 * k;
+              ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+            }
+            ctx.restore();
+          }
           const p = this.pos();
           const ang = Math.atan2(to.y - from.y, to.x - from.x);
           ctx.save();
@@ -301,13 +390,57 @@
     }
 
     // ------------------------------------------------------------ update & render
-    update(dt) {
+    update(realDt) {
+      // skala waktu: hit-stop membekukan, slow-motion memperlambat
+      let scale = 1;
+      if (this.hitstop > 0) { this.hitstop -= realDt; scale = 0; }
+      else if (this.slowT > 0) { this.slowT -= realDt; scale = this.slowScale; }
+      const dt = realDt * scale;
+      this.gt += dt;
+      if (this.timers.length) {
+        const due = this.timers.filter((t) => t.at <= this.gt);
+        if (due.length) { this.timers = this.timers.filter((t) => t.at > this.gt); due.forEach((t) => t.fn()); }
+      }
+      if (this.tweens.length) {
+        const done = [];
+        for (const tw of this.tweens) {
+          const k = clamp((this.gt - tw.start) / tw.dur);
+          tw.fn(k);
+          if (k >= 1) done.push(tw);
+        }
+        if (done.length) { this.tweens = this.tweens.filter((tw) => !done.includes(tw)); done.forEach((tw) => tw.res()); }
+      }
+      // kamera (pegas halus), getar & overlay berjalan di waktu nyata
+      const ck = 1 - Math.exp(-this.camT.rate * dt);
+      this.cam.x += (this.camT.x - this.cam.x) * ck;
+      this.cam.y += (this.camT.y - this.cam.y) * ck;
+      this.cam.z += (this.camT.z - this.cam.z) * ck;
+      this.kick.x *= Math.pow(0.0008, realDt); this.kick.y *= Math.pow(0.0008, realDt);
+      this.bars += (this.barsT - this.bars) * Math.min(1, realDt * 7);
+      const cin = this.barsT > 0;
+      if (cin !== this._cinema) { this._cinema = cin; if (this.onCinema) this.onCinema(cin); }
+      this.hurt = Math.max(0, this.hurt - realDt * 1.6);
+      this.danger += (this.dangerT - this.danger) * Math.min(1, realDt * 4);
+      this.impact = Math.max(0, this.impact - realDt);
+      if (this.speed) { this.speed.a += (this.speed.aT - this.speed.a) * Math.min(1, realDt * 8); if (this.speed.aT === 0 && this.speed.a < 0.02) this.speed = null; }
+      this.callouts = this.callouts.filter((c) => { c.t += realDt; return c.t < c.dur; });
+      if (this.combo) { this.combo.t += realDt; this.combo.pop = Math.max(0, this.combo.pop - realDt * 5); if (this.combo.fade && this.combo.t > this.combo.fade) this.combo = null; }
       this.t += dt;
       for (const a of this.actors.values()) {
         a.anim.update(dt);
         a.x += (a.tx - a.x) * Math.min(1, dt * 4);
         a.y += (a.ty - a.y) * Math.min(1, dt * 4);
-        a.ox *= Math.pow(0.0005, dt); a.oy *= Math.pow(0.0005, dt);
+        if (!a.dashing) { a.ox *= Math.pow(0.0005, dt); a.oy *= Math.pow(0.0005, dt); }
+        a.rot = (a.rot || 0) * Math.pow(0.002, dt);
+        if (a.trailOn) {
+          a.trailAcc = (a.trailAcc || 0) + dt;
+          if (a.trailAcc > 0.022) {
+            a.trailAcc = 0;
+            (a.trail = a.trail || []).push({ x: a.x + a.ox, y: a.y + a.oy, anim: a.anim.anim, frame: a.anim.frame(), life: 1 });
+            if (a.trail.length > 7) a.trail.shift();
+          }
+        }
+        if (a.trail) { a.trail.forEach((g) => { g.life -= dt * 3.2; }); a.trail = a.trail.filter((g) => g.life > 0); }
         a.flash = Math.max(0, a.flash - dt * 2.5);
         a.spawn = Math.max(0, a.spawn - dt * 1.5);
       }
@@ -317,8 +450,10 @@
         if (e.atkT >= 0) { e.atkT += dt / (e.atkDur || 1.2); e.st.atk = Math.min(1, e.atkT); if (e.atkT >= 1) { e.atkT = -1; e.st.atk = 0; } }
         if (e.skillT >= 0) { e.skillT += dt / (e.skillDur || 1.4); e.st.skill = Math.min(1, e.skillT); if (e.skillT >= 1) { e.skillT = -1; e.st.skill = 0; } }
         e.st.dying = e.dying;
-        e.hitT = Math.max(0, e.hitT - dt * 3);
+        e.hitT = Math.max(0, e.hitT - dt * 6);
         e.ox *= Math.pow(0.002, dt);
+        e.squash = Math.max(0, (e.squash || 0) - dt * 4);
+        e.rage = (e.rage || 0) + ((e.rageT || 0) - (e.rage || 0)) * Math.min(1, dt * 5);
         e.barHp = e.barHp == null ? e.shownHp : e.barHp + (e.shownHp - e.barHp) * Math.min(1, dt * 6);
       }
       this.fx = this.fx.filter((f) => {
@@ -331,7 +466,7 @@
         return p.life < p.max;
       });
       this.texts = this.texts.filter((t) => { t.t += dt; t.y += t.vy * dt; t.vy *= 0.96; return t.t < t.dur; });
-      this.shake *= Math.pow(0.02, dt);
+      this.shake *= Math.pow(0.02, realDt);
       this.dim += (this.dimTarget - this.dim) * Math.min(1, dt * 5);
       this.fade += (this.fadeTarget - this.fade) * Math.min(1, dt * 4);
       this.flash = Math.max(0, this.flash - dt * 2);
@@ -344,8 +479,14 @@
       const ctx = this.ctx;
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      const sx = (Math.random() - 0.5) * this.shake, sy = (Math.random() - 0.5) * this.shake;
-      ctx.translate(sx, sy);
+      const sx = (Math.random() - 0.5) * this.shake + this.kick.x, sy = (Math.random() - 0.5) * this.shake + this.kick.y;
+      const z = Math.max(1, this.cam.z);
+      const hw = W / (2 * z), hh = H / (2 * z);
+      const cx = clamp(this.cam.x, hw, W - hw), cy = clamp(this.cam.y, hh, H - hh);
+      this.view = { cx, cy, z };
+      ctx.translate(W / 2 + sx, H / 2 + sy);
+      ctx.scale(z, z);
+      ctx.translate(-cx, -cy);
       Backgrounds.draw(ctx, this.stage, this.phase, this.t, this.scroll, this.lightning);
 
       this.fx.filter((f) => f.layer === 'back').forEach((f) => f.draw(ctx));
@@ -367,7 +508,8 @@
       this.drawTexts();
       if (this.flash > 0.01) { ctx.fillStyle = `rgba(${this.flashColor},${this.flash})`; ctx.fillRect(-50, -50, W + 100, H + 100); }
       ctx.restore();
-      if (this.enemy && this.enemyBarVisible) this.drawEnemyBar();
+      this.drawOverlays();
+      if (this.enemy && this.enemyBarVisible && this.bars < 0.5) this.drawEnemyBar();
       if (this.banner) this.drawBanner();
       if (this.fade > 0.01) { ctx.fillStyle = `rgba(0,0,0,${this.fade})`; ctx.fillRect(0, 0, W, H); }
     }
@@ -394,10 +536,19 @@
         opt.filter = a.flash > 0.7 ? 'brightness(2.4)' : `sepia(1) saturate(6) hue-rotate(-45deg) brightness(${1 + a.flash * 0.4})`;
       }
       if (a.spawn > 0) opt.alpha *= 1 - a.spawn * 0.8;
+      // bayangan jejak (afterimage) saat melesat
+      if (a.trail && a.trail.length) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (const g of a.trail) {
+          Sprites.draw(ctx, sheet, g.anim, g.frame, g.x, g.y, a.h, { alpha: 0.3 * g.life, glow: false });
+        }
+        ctx.restore();
+      }
       // idle bernapas
       const breath = anim === 'idle' && !a.ko ? Math.sin(this.t * 2.2 + a.x) * 0.012 : 0;
       ctx.save();
       ctx.translate(a.x + a.ox, a.y + a.oy);
+      if (a.rot) ctx.rotate(a.rot);
       ctx.scale(1 - breath * 0.5, 1 + breath);
       Sprites.draw(ctx, sheet, anim, frame, 0, 0, a.h, opt);
       ctx.restore();
@@ -461,10 +612,16 @@
         ctx.translate(lunge, 0);
       }
       const sc = e.scale * (e.def.scaleFix || 1);
+      // aura merah saat musuh bersiap menyerang (telegraph)
+      if (e.rage > 0.02) {
+        const pul = 0.75 + 0.25 * Math.sin(this.t * 14);
+        glow(ctx, 0, -e.def.height * sc * 0.5, e.def.height * sc * 0.95, 'rgba(255,30,40,1)', 0.55 * e.rage * pul);
+      }
       ctx.scale(sc, sc);
+      if (e.squash > 0) { const q = e.squash; ctx.scale(1 + 0.07 * q, 1 - 0.07 * q); }
       ctx.globalAlpha = alpha;
       let filter = 'none';
-      if (e.hitT > 0.6) filter = 'brightness(3)';
+      if (e.hitT > 0.8) filter = 'brightness(3)';
       else if (e.hitT > 0) filter = `brightness(${1 + e.hitT}) saturate(${1 + e.hitT})`;
       if (e.dying >= 0 && (!e.def.deathPose || e.dying < 0.12)) filter = `brightness(${1 + Math.abs(Math.sin(e.dying * 30)) * 1.5}) saturate(0.6)`;
       if (e.tint) filter = e.tint;
@@ -476,6 +633,97 @@
         const p = this.enemyHead();
         this.emit(p.x + rand(-150, 150), p.y + rand(-250, 250), e.def.color === '#fb923c' ? '255,120,40' : '170,90,255', rand(6, 14), 0, -rand(60, 200), 1.0);
       }
+    }
+
+    // world -> layar (untuk overlay yang mengikuti kamera)
+    toScreen(x, y) {
+      const v = this.view || { cx: W / 2, cy: H / 2, z: 1 };
+      return { x: (x - v.cx) * v.z + W / 2, y: (y - v.cy) * v.z + H / 2 };
+    }
+
+    drawOverlays() {
+      const ctx = this.ctx;
+      ctx.save();
+      // speed lines ala manga menuju titik fokus
+      if (this.speed && this.speed.a > 0.02) {
+        const c = this.toScreen(this.speed.x, this.speed.y);
+        ctx.globalCompositeOperation = 'lighter';
+        const n = 70;
+        for (let i = 0; i < n; i++) {
+          const ang = (i / n) * TAU + Math.random() * 0.08;
+          const r0 = 260 + Math.random() * 260, r1 = 1500;
+          const w = 2 + Math.random() * 7;
+          ctx.strokeStyle = `rgba(${this.speed.color},${this.speed.a * (0.25 + Math.random() * 0.45)})`;
+          ctx.lineWidth = w;
+          ctx.beginPath();
+          ctx.moveTo(c.x + Math.cos(ang) * r0, c.y + Math.sin(ang) * r0);
+          ctx.lineTo(c.x + Math.cos(ang) * r1, c.y + Math.sin(ang) * r1);
+          ctx.stroke();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      // vignette bahaya (musuh bersiap) & terluka
+      const red = Math.max(this.hurt, this.danger * (0.6 + 0.4 * Math.sin(this.t * 9)));
+      if (red > 0.02) {
+        const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
+        g.addColorStop(0, 'rgba(120,0,0,0)');
+        g.addColorStop(1, `rgba(200,0,10,${0.75 * red})`);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
+      // cinema bar
+      if (this.bars > 0.01) {
+        const bh = 120 * easeOut(this.bars);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, bh); ctx.fillRect(0, H - bh, W, bh);
+      }
+      // combo counter
+      const cb = this.combo;
+      if (cb && cb.hits > 1) {
+        const a = cb.fade ? clamp(1 - (cb.t - cb.fade + 0.4) / 0.4) : 1;
+        const pop = 1 + 0.35 * cb.pop;
+        ctx.globalAlpha = a;
+        ctx.translate(330, 330);
+        ctx.rotate(-0.08);
+        ctx.scale(pop, pop);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = 'italic 900 112px Nunito, system-ui, sans-serif';
+        ctx.lineWidth = 16; ctx.strokeStyle = '#3b0a0a'; ctx.lineJoin = 'round';
+        ctx.strokeText(String(cb.hits), 0, 0);
+        const gg = ctx.createLinearGradient(0, -50, 0, 50);
+        gg.addColorStop(0, '#fff7c2'); gg.addColorStop(0.5, '#facc15'); gg.addColorStop(1, '#f97316');
+        ctx.fillStyle = gg; ctx.fillText(String(cb.hits), 0, 0);
+        ctx.font = 'italic 900 40px Nunito, sans-serif';
+        ctx.lineWidth = 8; ctx.strokeText('HIT COMBO', 0, 70);
+        ctx.fillStyle = '#fff'; ctx.fillText('HIT COMBO', 0, 70);
+        ctx.font = '800 26px Nunito, sans-serif';
+        ctx.lineWidth = 6; ctx.strokeText(`${cb.dmg} damage`, 0, 112);
+        ctx.fillStyle = '#fde68a'; ctx.fillText(`${cb.dmg} damage`, 0, 112);
+        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+      }
+      // callout besar (FINISH!, K.O.!, SERANGAN!)
+      for (const c of this.callouts) {
+        const k = c.t / c.dur;
+        const inK = easeOut(c.t / 0.18);
+        const sc = 1.8 - 0.8 * inK;
+        const a = k > 0.75 ? 1 - (k - 0.75) / 0.25 : 1;
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.translate(W / 2, c.y); ctx.rotate(-0.05); ctx.scale(sc, sc);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `italic 900 ${c.size}px Cinzel, Georgia, serif`;
+        ctx.lineWidth = c.size * 0.12; ctx.strokeStyle = '#120414'; ctx.lineJoin = 'round';
+        ctx.strokeText(c.text, 0, 0);
+        ctx.fillStyle = c.color; ctx.fillText(c.text, 0, 0);
+        if (c.sub) { ctx.font = '800 34px Nunito, sans-serif'; ctx.lineWidth = 7; ctx.strokeText(c.sub, 0, c.size * 0.62); ctx.fillStyle = '#fff'; ctx.fillText(c.sub, 0, c.size * 0.62); }
+        ctx.restore();
+      }
+      // impact frame: warna terbalik sesaat (gaya anime)
+      if (this.impact > 0) {
+        ctx.globalCompositeOperation = 'difference';
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.restore();
     }
 
     drawEnemyBar() {
@@ -522,6 +770,12 @@
       for (const p of this.particles) {
         if (!!p.top !== top) continue;
         const k = 1 - p.life / p.max;
+        if (p.streak) {
+          // percikan memanjang searah gerak (lebih tajam dari titik bulat)
+          ctx.strokeStyle = `rgba(${p.color},${k})`; ctx.lineWidth = p.size * (0.3 + 0.5 * k); ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.045, p.y - p.vy * 0.045); ctx.stroke();
+          continue;
+        }
         ctx.fillStyle = `rgba(${p.color},${k})`;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + k * 0.6), 0, TAU); ctx.fill();
       }
@@ -583,22 +837,43 @@
       const ch = a.char;
       const sheet = Sprites.get(a.charId);
       const fps = ch.fps.attack;
+      const nFrames = sheet ? Sprites.frameCount(sheet, 'attack') : 6;
+      const impactDelay = (Math.min(ch.impact, nFrames - 1) / fps) * 1000;
+      const type = ch.projectile;
+      const color = TRAIL_COL[type] || '255,220,120';
+      const sfx = ({ slash: Sfx.slash, fireball: Sfx.fire, holy: Sfx.holy, arrow: Sfx.arrow, dagger: Sfx.slash, shockwave: Sfx.slash })[type];
+      if (MELEE.has(ch.id) && this.enemy) {
+        // jarak dekat: melesat ke depan musuh dengan afterimage, tebas, lalu lompat kembali
+        const e = this.enemy;
+        const reach = e.def.width * 0.42 * (e.def.scaleFix || 1);
+        const dx = (e.x - reach - a.h * 0.25 + rand(-40, 30)) - a.x;
+        a.dashing = true; a.trailOn = true;
+        Sfx.whoosh();
+        await this.tween(170, (k) => { a.ox = dx * easeIn(k); a.oy = -Math.sin(k * Math.PI) * 24; });
+        this.burst(a.x + a.ox, a.y, '230,220,200', 8, 260, 6, { grav: 200 });   // debu mendarat
+        a.anim.set('attack', false);
+        await this.wait(impactDelay);
+        sfx();
+        this.hitEnemy(r.damage, { color, ult: r.ultimate, hpDrop: r.damage * scaleHp });
+        await this.wait(Math.max(90, ((nFrames - ch.impact) / fps) * 500));
+        a.anim.set('idle', true);
+        await this.tween(240, (k) => { a.ox = dx * (1 - easeOut(k)); a.oy = -Math.sin(k * Math.PI) * 70; });
+        a.ox = 0; a.oy = 0; a.dashing = false; a.trailOn = false;
+        return;
+      }
+      // jarak jauh: kilatan di tangan lalu proyektil berekor cahaya
       a.anim.set('attack', false, () => a.anim.set('idle', true));
-      if (ch.id === 'ksatria' || ch.id === 'paladin' || ch.id === 'assassin') a.ox = 0;
-      const lunge = ch.id === 'ksatria' || ch.id === 'paladin';
-      if (lunge) this.tween(350, (k) => { a.ox = Math.sin(k * Math.PI) * 70; });
-      const impactDelay = (Math.min(ch.impact, (sheet ? Sprites.frameCount(sheet, 'attack') : 6) - 1) / fps) * 1000;
       await this.wait(impactDelay);
       const from = this.actorMuzzle(a);
       const head = this.enemyHead();
       const to = { x: head.x + rand(-60, 40), y: head.y + rand(-90, 90) };
-      const type = ch.projectile;
-      ({ slash: Sfx.slash, fireball: Sfx.fire, holy: Sfx.holy, arrow: Sfx.arrow, dagger: Sfx.slash, shockwave: Sfx.slash })[type]();
+      this.burst(from.x, from.y, color, 8, 260, 7, { grav: 0 });
+      a.ox = -10;  // hentakan mundur saat melepas serangan
+      sfx();
       const dist = Math.hypot(to.x - from.x, to.y - from.y);
-      const colors = { slash: '255,210,90', fireball: '255,140,40', holy: '255,240,170', arrow: '120,255,160', dagger: '190,120,255', shockwave: '120,190,255' };
       return new Promise((res) => {
-        this.projectile(type, from, to, dist / 1700, () => {
-          this.hitEnemy(r.damage, { color: colors[type], hpDrop: r.damage * scaleHp });
+        this.projectile(type, from, to, dist / 2300, () => {
+          this.hitEnemy(r.damage, { color, ult: r.ultimate, hpDrop: r.damage * scaleHp });
           res();
         });
       });
@@ -608,7 +883,10 @@
       const ch = a.char;
       const sheet = Sprites.get(a.charId);
       Sfx.ultimate();
+      Sfx.charge();
       this.dimTarget = 0.72;
+      this.barsT = 1;
+      this.focus(660, 700, 1.12, 3);
       a.hidden = true;
       const anim = new Sprites.Animator(ch.id, ch.fps);
       anim.set('ultimate', false);
@@ -618,10 +896,14 @@
       const n = sheet ? Sprites.frameCount(sheet, 'ultimate') : 4;
       const animMs = Math.min(1500, Math.max(1000, (n / ch.fps.ultimate) * 1000));
       for (let i = 0; i < 8; i++) this.burst(560, 760, rgb, 6, 300, 8, { grav: -50 });
+      this.speed = { x: 560, y: 760, color: rgb, a: 0, aT: 0.85 };
       await this.wait(animMs + 150);
+      this.speed.aT = 0;
       await this.ultimateFx(ch.ultimateFx, r, scaleHp, ch);
       this.spot = null;
       this.dimTarget = 0;
+      this.barsT = 0;
+      this.resetCam(3);
       a.hidden = false;
       a.anim.set('idle', true);
     }
@@ -631,7 +913,11 @@
       const e = this.enemy;
       const self = this;
       const hit = (color) => {
+        // momen hantaman ultimate: impact frame, hit-stop, slow-motion, kamera mendekat
+        this.impactFrame(90);
+        this.focus(head.x, head.y + 30, 1.3, 9);
         this.hitEnemy(r.damage, { big: true, color, hpDrop: r.damage * scaleHp });
+        this.slowMo(0.35, 650);
         this.flash = 0.6; this.flashColor = '255,240,220';
         Sfx.boom();
       };
@@ -819,17 +1105,37 @@
       // musuh bersprite memakai skill bila banyak yang salah
       const SKILL_NAMES = { wolf: 'Lolongan Kristal!', golem: 'Gempa Kristal!' };
       const useSkill = !!SKILL_NAMES[key] && targets.length >= Math.max(2, this.actors.size * 0.5);
-      if (useSkill) {
-        e.skillT = 0; e.skillDur = 1.5;
-        Sfx.roar(); this.shake = key === 'golem' ? 22 : 14;
-        this.addText(e.x - 60, e.y - e.def.height * 1.45, SKILL_NAMES[key], '#d8b4fe', 44, { dur: 1.6, vy: -20 });
-        await this.wait(700);
-      } else {
-        e.atkT = 0; e.atkDur = 1.2;
-        Sfx.enemyAttack();
-        await this.wait(560);
-      }
+      const sc = e.def.scaleFix || 1;
       const head = this.enemyHead();
+      const pc = this.partyCenter();
+      this.combo = null;
+
+      // 1) TELEGRAPH: kamera mendekat ke musuh, aura merah, layar berdenyut bahaya
+      this.barsT = 1;
+      this.focus(e.x - 40, e.y - e.def.height * sc * 0.55, 1.32, 5);
+      e.rageT = 1; this.dangerT = 0.75;
+      Sfx.warn();
+      this.callout(useSkill ? SKILL_NAMES[key] : 'AWAS!', useSkill ? '#e9d5ff' : '#fca5a5', {
+        size: useSkill ? 104 : 96, y: H * 0.22, dur: 1.25,
+        sub: `${targets.length} petualang menjadi sasaran!`,
+      });
+      if (useSkill) {
+        e.skillT = 0; e.skillDur = 1.7;
+        this.speed = { x: head.x, y: head.y, color: '190,120,255', a: 0, aT: 0.8 };
+        Sfx.roar(); this.shake = key === 'golem' ? 26 : 16;
+        await this.wait(950);
+      } else {
+        await this.wait(480);
+        e.atkT = 0; e.atkDur = 1.0;
+        Sfx.enemyAttack();
+        await this.wait(360);
+      }
+
+      // 2) RELEASE: whip-pan cepat ke party, serangan meluncur
+      e.rageT = 0; this.dangerT = 0;
+      if (this.speed) this.speed.aT = 0;
+      this.focus(pc + 80, 760, 1.1, 11);
+      let firstHit = true, koCount = 0;
       const proms = targets.map((t, i) => new Promise((res) => {
         const a = this.actors.get(t.id);
         if (!a) return res();
@@ -837,33 +1143,69 @@
           a.flash = 1;
           if (t.hit > 0) {
             a.anim.set('hit', false, () => { a.anim.set('idle', true); res(); });
-            this.addText(a.x, a.y - a.h - 10, `-${t.hit}`, '#f87171', 44);
-            this.burst(a.x, a.y - a.h * 0.5, '255,90,90', 10, 300, 6);
+            // knockback: terpental ke belakang dan sedikit terangkat
+            a.ox = -rand(55, 85); a.oy = -rand(14, 26); a.rot = -0.14;
+            this.addText(a.x + rand(-20, 20), a.y - a.h - 10, `-${t.hit}`, '#f87171', 58, { stroke: '#450a0a' });
+            this.sparks(a.x, a.y - a.h * 0.55, '255,90,90', 10, 800, Math.PI);
+            this.burst(a.x, a.y - a.h * 0.5, '255,90,90', 8, 280, 6);
+            this.hurt = Math.min(1, this.hurt + 0.3);
+            this.kick.x -= 7;
             a.hp = t.hp;
             Sfx.hurt();
-            if (t.koNow) setTimeout(() => { a.ko = true; }, 600);
+            if (firstHit) { firstHit = false; this.hitStop(80); }
+            if (t.koNow) {
+              koCount++;
+              this.after(450, () => { a.ko = true; this.burst(a.x, a.y - 20, '200,200,220', 14, 220, 7, { grav: 200 }); });
+            }
           } else res();
-          this.shake = Math.max(this.shake, 8);
+          this.shake = Math.max(this.shake, 10);
         };
         const to = { x: a.x, y: a.y - a.h * 0.55 };
-        setTimeout(() => {
+        this.after(i * Math.min(80, 800 / targets.length), () => {
           if (key === 'wolf') {
-            if (useSkill) this.projectile('shard', { x: a.x + rand(-60, 120), y: -80 }, to, 0.5, doHit);
-            else this.projectile('claw', { x: head.x - 160, y: head.y }, to, 0.42, doHit);
+            if (useSkill) this.projectile('shard', { x: a.x + rand(-60, 120), y: -80 }, to, 0.42, doHit);
+            else this.projectile('claw', { x: head.x - 160, y: head.y }, to, 0.34, doHit);
           } else if (key === 'golem') {
             if (useSkill) this.crystalSpike(a, doHit);
-            else this.projectile('rock', { x: head.x - 200, y: e.y - 40 }, to, 0.55, doHit);
-          } else if (key === 'slime') this.projectile('blob', { x: head.x - 80, y: head.y }, to, 0.6, doHit);
-          else if (key === 'skeleton') this.projectile('boneSlash', { x: head.x - 120, y: head.y }, to, 0.45, doHit);
-          else if (key === 'general') this.projectile('orb', { x: head.x - 150, y: head.y + 40 }, to, 0.5, doHit);
-          else if (key === 'demonking1') { this.bolt(a.x, a.y, '200,120,255'); setTimeout(doHit, 120); } else { this.skyFire(a, doHit); }
-        }, i * Math.min(90, 900 / targets.length));
+            else this.projectile('rock', { x: head.x - 200, y: e.y - 40 }, to, 0.45, doHit);
+          } else if (key === 'slime') this.projectile('blob', { x: head.x - 80, y: head.y }, to, 0.5, doHit);
+          else if (key === 'skeleton') this.projectile('boneSlash', { x: head.x - 120, y: head.y }, to, 0.38, doHit);
+          else if (key === 'general') this.projectile('orb', { x: head.x - 150, y: head.y + 40 }, to, 0.42, doHit);
+          else if (key === 'demonking1') { this.bolt(a.x, a.y, '200,120,255'); this.after(120, doHit); } else { this.skyFire(a, doHit); }
+        });
       }));
       if (payload.shield) {
         this.addText(640, 470, 'Perisai Rune! Serangan ½', '#93c5fd', 42, { dur: 1.8 });
       }
       await Promise.all(proms);
+      if (koCount) {
+        // momen dramatis saat ada yang pingsan
+        this.slowMo(0.35, 700);
+        this.callout('K.O.!', '#f87171', { size: 150, y: H * 0.38, dur: 1.5, sub: `${koCount} petualang pingsan — jawab benar untuk bangkit!` });
+        Sfx.ko();
+        await this.wait(450);
+      }
       await this.wait(250);
+      this.barsT = 0;
+      this.resetCam(3);
+    }
+
+    // Pukulan penghabisan: slow-motion, impact frame, kamera menempel ke musuh
+    async finisher() {
+      const e = this.enemy; if (!e) return;
+      const p = this.enemyHead();
+      this.barsT = 1;
+      this.focus(p.x, p.y + 40, 1.38, 8);
+      this.impactFrame(110);
+      this.hitStop(130);
+      this.slowMo(0.22, 1100);
+      this.flash = 0.7; this.flashColor = '255,255,255';
+      this.sparks(p.x, p.y, '255,240,200', 40, 1700, null, true);
+      this.burst(p.x, p.y, '255,230,160', 40, 900, 10);
+      this.shake = 34;
+      this.callout('FINISH!', '#fde047', { size: 170, dur: 1.7, sub: `${e.name} tumbang!` });
+      Sfx.boom(); Sfx.crit();
+      await this.wait(420);
     }
 
     // Paku kristal muncul dari tanah di bawah karakter
@@ -1012,15 +1354,32 @@
       }
 
       if (correct.length === 0) {
-        this.addText(W / 2, 520, 'Tidak ada yang menjawab benar…', '#fca5a5', 52, { dur: 1.8, vy: -20 });
-        await this.wait(900);
+        this.callout('MELESET…', '#94a3b8', { size: 110, dur: 1.6, sub: 'Tidak ada yang menjawab benar' });
+        Sfx.wrong();
+        await this.wait(1000);
       } else {
-        // serangan party
+        // 1) aba-aba: kamera ke party, kilau emas pada yang menjawab benar
+        const pc = this.partyCenter();
+        this.combo = { hits: 0, dmg: 0, t: 0, pop: 0 };
+        this.focus(pc + 60, 720, 1.1, 6);
+        Sfx.charge();
+        this.callout('SERANGAN!', '#fde68a', { size: 110, y: H * 0.26, dur: 0.95, sub: `${correct.length} petualang menjawab benar` });
+        for (const r of correct) {
+          const a = this.actors.get(r.id);
+          a.flash = 0.6;
+          this.burst(a.x, a.y - a.h * 0.5, '255,220,120', 8, 220, 6, { grav: -80 });
+        }
+        await this.wait(480);
+        // 2) serangan beruntun: kamera menyorot medan, lalu menempel ke musuh
+        this.focus((pc + ENEMY_X) / 2 + 80, 720, 1.04, 3);
         const step = Math.min(110, 1400 / Math.max(1, normal.length));
+        this.after(step * normal.length * 0.5 + 250, () => this.focus(ENEMY_X - 160, 640, 1.16, 3));
         const proms = normal.map((r, i) => this.wait(i * step).then(() => this.attack(this.actors.get(r.id), r, scaleHp)));
         await Promise.all(proms);
+        if (this.combo) this.combo.fade = 1.3;
         await this.wait(250);
         for (const r of featured) await this.ultimate(this.actors.get(r.id), r, scaleHp);
+        if (!payload.enemy.defeated) this.resetCam(2.5);
       }
       if (payload.heal && !featured.some((r) => this.actors.get(r.id) && this.actors.get(r.id).charId === 'biarawati')) await this.partyHeal();
       if (e) { e.hp = payload.enemy.hpAfter; e.shownHp = payload.enemy.hpAfter; }
@@ -1037,13 +1396,19 @@
       this.barrier = 0;
 
       if (payload.enemy.defeated) {
+        await this.finisher();
         await this.enemyDeath();
+        this.barsT = 0;
+        this.resetCam(2);
         if (payload.next) {
           if (payload.next.key === 'demonking' && payload.next.phase === 2) await this.bossPhase2(payload.next);
           else await this.transitionTo(payload.next);
           for (const a of this.actors.values()) { a.hp = 100; a.ko = false; }
         }
       }
+      this.barsT = 0; this.dangerT = 0;
+      this.resetCam(2);
+      if (this.combo) this.combo.fade = this.combo.fade || 0.8;
       await this.wait(300);
     }
 

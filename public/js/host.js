@@ -72,6 +72,7 @@
     $('#game').hidden = false;
     fit();
     if (!battle) battle = new Battle($('#cv'));
+    battle.onCinema = (on) => document.body.classList.toggle('cinema', on);
     // muat semua sprite di awal
     GameData.CHARACTERS.forEach((c) => Sprites.load(c.id));
     room = snapshot;

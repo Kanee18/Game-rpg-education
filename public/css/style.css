@@ -276,3 +276,7 @@ body.play input { user-select: text; }
 .final-stats div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0.6rem 0.9rem; display: flex; flex-direction: column; }
 .final-stats b { font-size: 1.4rem; color: var(--gold); } .final-stats span { font-size: 0.8rem; color: var(--muted); font-weight: 800; }
 .conn { position: fixed; top: 0; left: 0; right: 0; z-index: 10; background: #b91c1c; color: #fff; text-align: center; font-weight: 800; padding: 0.4rem; }
+
+/* Saat adegan sinematik (cinema bar), panel HTML disembunyikan sementara */
+#qpanel, #leader, #corner, #controls { transition: opacity 0.25s; }
+body.cinema #qpanel, body.cinema #leader, body.cinema #corner, body.cinema #controls { opacity: 0; pointer-events: none; }
