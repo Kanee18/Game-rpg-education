@@ -236,6 +236,7 @@
   // Stage tanpa gambar memakai latar prosedural di atas.
   const IMAGE_STAGES = {
     '1:1': { bg: '/assets/backgrounds/stage1_bg.webp', fg: '/assets/backgrounds/stage1_fg.webp', fgY: 70, particles: 'fog' },
+    '2:1': { bg: '/assets/backgrounds/stage2_bg.webp', fg: '/assets/backgrounds/stage2_fg.webp', fgY: 70, particles: 'mist' },
   };
   const images = {};
   function img(src) {

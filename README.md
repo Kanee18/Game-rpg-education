@@ -7,7 +7,7 @@ dari **7 karakter**, lalu HP mereka berubah menjadi tombol **A / B / C / D** unt
 - Jawaban **benar** → karakter menyerang musuh (animasi serangan) dan siswa mendapat **poin** (makin cepat makin besar).
 - Jawaban **salah / tidak menjawab** → karakter **terkena serangan musuh** (HP berkurang, bisa pingsan/KO).
 - Benar **3× berturut-turut** → **ULTIMATE!** (adegan sinematik, damage 2,5×).
-- Party melawan **4 musuh** bertahap: Serigala Kristal Bayangan → Ksatria Tengkorak → Jenderal Iblis Vargoth →
+- Party melawan **4 musuh** bertahap: Serigala Kristal Bayangan → Golem Kristal Purba → Jenderal Iblis Vargoth →
   **Raja Iblis Azaroth** yang bangkit ke **Fase 2 (Wujud Sejati)** setelah dikalahkan.
 
 ## Karakter
@@ -142,11 +142,14 @@ entrinya di `IMAGE_STAGES` pada `public/js/backgrounds.js` (kunci `"stage:fase"`
 `'4:2'` untuk Raja Iblis fase 2). Latar depan digambar di depan karakter dan bergeser lebih cepat
 saat party berjalan (efek parallax). Stage yang belum punya gambar tetap memakai latar prosedural.
 
-Saat ini: Stage 1 (Lembah Berkabut) memakai gambar; Stage 2–4 masih prosedural.
+Saat ini: Stage 1 (Lembah Berkabut) dan Stage 2 (Gua Kristal) memakai gambar; Stage 3–4 masih prosedural.
+Lembar latar boleh juga berupa dua file terpisah (`bg_file`, `fg_file`) seperti Stage 2.
 
 ## Mengganti / menambah sprite musuh
 
 Lembar pose musuh (idle, serangan, skill, mati) berlatar papan catur disimpan di `assets-src/enemies/`.
 Daftarkan kotak tiap pose di `CONFIG` pada `tools/prepare_enemies.py`, lalu jalankan
 `python3 tools/prepare_enemies.py --debug`. Hasilnya `public/assets/enemies/<id>.webp/.json`.
-Saat ini Stage 1 memakai Serigala Kristal Bayangan (`wolf`); musuh lain masih digambar dengan kode.
+Saat ini Stage 1 memakai Serigala Kristal Bayangan (`wolf`) dan Stage 2 Golem Kristal Purba (`golem`);
+musuh lain masih digambar dengan kode. Bila lembar tidak punya pose idle, pose idle bisa dibuat dari
+pose lain (lihat konfigurasi `golem`).

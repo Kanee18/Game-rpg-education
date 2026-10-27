@@ -590,16 +590,23 @@
     return s && s.meta && s.img.complete && s.img.naturalWidth ? s : null;
   }
 
+  function pickPose(st) {
+    if (st.dying >= 0.12) return 'defeat';
+    if (st.skill > 0) return 'skill';
+    if (st.atk > 0.3 && st.atk < 0.85) return 'attack';
+    return 'idle';
+  }
+  function drawFrame(ctx, s, pose, H) {
+    const f = s.meta.frames[pose];
+    const k = H / s.meta.bodyH;
+    ctx.drawImage(s.img, f[0], f[1], f[2], f[3], -f[4] * k, -f[5] * k, f[2] * k, f[3] * k);
+  }
+
   function wolf(ctx, st) {
     const s = sheetReady('wolf');
     if (!s) return slime(ctx, st);   // cadangan bila gambar belum termuat
     const t = st.t, H = DEFS.wolf.height;
-    let pose = 'idle';
-    if (st.dying >= 0.12) pose = 'defeat';
-    else if (st.skill > 0) pose = 'skill';
-    else if (st.atk > 0.3 && st.atk < 0.85) pose = 'attack';
-    const f = s.meta.frames[pose];
-    const k = H / s.meta.bodyH;
+    const pose = pickPose(st);
     shadow(ctx, pose === 'defeat' ? 230 : 190);
     // aura kristal di punggung berdenyut
     const pul = 0.5 + 0.5 * Math.sin(t * 3);
@@ -612,7 +619,7 @@
     } else if (pose === 'skill') {
       ctx.translate(Math.sin(t * 40) * 3, 0);        // bergetar saat melolong
     }
-    ctx.drawImage(s.img, f[0], f[1], f[2], f[3], -f[4] * k, -f[5] * k, f[2] * k, f[3] * k);
+    drawFrame(ctx, s, pose, H);
     ctx.restore();
     if (pose === 'skill') {
       // tanduk cahaya di kepala yang mendongak
@@ -631,7 +638,37 @@
     }
   }
 
+  function golem(ctx, st) {
+    const s = sheetReady('golem');
+    if (!s) return skeleton(ctx, st);
+    const t = st.t, H = DEFS.golem.height;
+    const pose = pickPose(st);
+    const pul = 0.5 + 0.5 * Math.sin(t * 2.4);
+    shadow(ctx, pose === 'defeat' ? 260 : 200);
+    if (pose === 'skill') glow(ctx, 0, -H * 0.55, 360, 'rgba(90,120,255,1)', 0.35 + 0.25 * pul);
+    else if (pose !== 'defeat') glow(ctx, -20, -H * 0.62, 90, 'rgba(120,150,255,1)', 0.15 + 0.15 * pul); // rune dada
+    ctx.save();
+    if (pose === 'idle') {
+      const b = Math.sin(t * 1.7);
+      ctx.translate(0, b * 2);
+      ctx.scale(1, 1 + 0.01 * b);                     // napas berat
+    } else if (pose === 'skill') {
+      ctx.translate(Math.sin(t * 45) * 4, Math.sin(t * 31) * 2);
+    }
+    drawFrame(ctx, s, pose, H);
+    ctx.restore();
+    if (pose === 'attack' && st.atk < 0.7) {
+      // gelombang kejut di tanah saat tinju menghantam
+      const p = Math.min(1, (st.atk - 0.3) / 0.4);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = `rgba(150,170,255,${0.9 * (1 - p)})`; ctx.lineWidth = 10 * (1 - p) + 2;
+      ctx.beginPath(); ctx.ellipse(-150, -8, 60 + 260 * p, 14 + 50 * p, 0, 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   const DEFS = {
+    golem: { draw: golem, height: 340, scaleFix: 1.15, width: 560, hitY: 0.55, color: '#818cf8', deathPose: true, sprite: 'golem' },
     wolf: { draw: wolf, height: 300, scaleFix: 1.12, width: 560, hitY: 0.5, color: '#a78bfa', deathPose: true, sprite: 'wolf' },
     slime: { draw: slime, height: 230, scaleFix: 1.45, width: 330, hitY: 0.45, color: '#a78bfa' },
     skeleton: { draw: skeleton, height: 500, scaleFix: 1.1, width: 300, hitY: 0.55, color: '#7dd3fc' },
@@ -646,6 +683,7 @@
   }
 
   loadSheet('wolf');
+  loadSheet('golem');
 
   window.Enemies = { def, glow, TAU };
 })();

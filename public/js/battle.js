@@ -206,6 +206,7 @@
           if (type === 'dagger') self.emit(p.x, p.y, '190,120,255', 5, -60, 0, 0.25);
           if (type === 'arrow') self.emit(p.x, p.y, '120,255,160', 4, -50, 0, 0.25);
           if (type === 'blob') self.emit(p.x, p.y, '170,90,255', 7, 0, 0, 0.3, 200);
+          if (type === 'rock') self.emit(p.x, p.y + 20, '150,140,130', 6, 0, -30, 0.35, 300);
           if (type === 'shard' || type === 'claw') self.emit(p.x, p.y, '190,120,255', 6, 0, -40, 0.3);
           if (this.t >= this.dur && !this.done) { this.done = true; onHit && onHit(p); }
           return !this.done;
@@ -262,6 +263,14 @@
             ctx.fillStyle = '#7c3aed'; ctx.strokeStyle = '#1e0533'; ctx.lineWidth = 4;
             ctx.beginPath(); ctx.ellipse(0, 0, 22, 18, self.t * 3, 0, TAU); ctx.fill(); ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(-6, -6, 5, 0, TAU); ctx.fill();
+          } else if (type === 'rock') {
+            ctx.rotate(self.t * -8);
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = '#6b7280'; ctx.strokeStyle = '#1f2430'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(-26, -8); ctx.lineTo(-10, -26); ctx.lineTo(18, -22); ctx.lineTo(28, 4); ctx.lineTo(10, 24); ctx.lineTo(-20, 18); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#a5b4fc'; ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(8, -40); ctx.lineTo(12, -20); ctx.fill();
+            ctx.globalCompositeOperation = 'lighter';
+            glow(ctx, 6, -26, 30, 'rgba(130,150,255,1)', 0.6);
           } else if (type === 'claw') {
             ctx.rotate(ang);
             for (let i = 0; i < 3; i++) {
@@ -807,12 +816,13 @@
       const e = this.enemy;
       if (!e || !targets.length) return;
       const key = e.key === 'demonking' ? 'demonking' + e.phase : e.key;
-      // serigala memakai skill (lolongan + hujan kristal) bila banyak yang salah
-      const useSkill = key === 'wolf' && targets.length >= Math.max(2, this.actors.size * 0.5);
+      // musuh bersprite memakai skill bila banyak yang salah
+      const SKILL_NAMES = { wolf: 'Lolongan Kristal!', golem: 'Gempa Kristal!' };
+      const useSkill = !!SKILL_NAMES[key] && targets.length >= Math.max(2, this.actors.size * 0.5);
       if (useSkill) {
         e.skillT = 0; e.skillDur = 1.5;
-        Sfx.roar(); this.shake = 14;
-        this.addText(e.x - 60, e.y - e.def.height * 1.45, 'Lolongan Kristal!', '#d8b4fe', 44, { dur: 1.6, vy: -20 });
+        Sfx.roar(); this.shake = key === 'golem' ? 22 : 14;
+        this.addText(e.x - 60, e.y - e.def.height * 1.45, SKILL_NAMES[key], '#d8b4fe', 44, { dur: 1.6, vy: -20 });
         await this.wait(700);
       } else {
         e.atkT = 0; e.atkDur = 1.2;
@@ -840,6 +850,9 @@
           if (key === 'wolf') {
             if (useSkill) this.projectile('shard', { x: a.x + rand(-60, 120), y: -80 }, to, 0.5, doHit);
             else this.projectile('claw', { x: head.x - 160, y: head.y }, to, 0.42, doHit);
+          } else if (key === 'golem') {
+            if (useSkill) this.crystalSpike(a, doHit);
+            else this.projectile('rock', { x: head.x - 200, y: e.y - 40 }, to, 0.55, doHit);
           } else if (key === 'slime') this.projectile('blob', { x: head.x - 80, y: head.y }, to, 0.6, doHit);
           else if (key === 'skeleton') this.projectile('boneSlash', { x: head.x - 120, y: head.y }, to, 0.45, doHit);
           else if (key === 'general') this.projectile('orb', { x: head.x - 150, y: head.y + 40 }, to, 0.5, doHit);
@@ -851,6 +864,33 @@
       }
       await Promise.all(proms);
       await this.wait(250);
+    }
+
+    // Paku kristal muncul dari tanah di bawah karakter
+    crystalSpike(a, cb) {
+      const self = this;
+      let hit = false;
+      Sfx.impact();
+      this.fx.push({
+        t: 0, dur: 0.9, layer: 'front',
+        update() { if (this.t > 0.25 && !hit) { hit = true; self.shake = Math.max(self.shake, 10); cb(); } },
+        draw(ctx) {
+          const k = this.t / this.dur;
+          const grow = k < 0.3 ? easeOut(k / 0.3) : 1;
+          const fade = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1;
+          ctx.save(); ctx.translate(a.x, a.y + 6); ctx.globalAlpha = fade;
+          for (const [dx, h, w] of [[-22, 0.7, 14], [0, 1, 18], [24, 0.6, 12]]) {
+            const hh = a.h * 0.75 * h * grow;
+            ctx.fillStyle = '#818cf8'; ctx.strokeStyle = '#1e1b4b'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(dx - w, 0); ctx.lineTo(dx, -hh); ctx.lineTo(dx + w, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'rgba(224,231,255,0.7)';
+            ctx.beginPath(); ctx.moveTo(dx - 2, -4); ctx.lineTo(dx, -hh * 0.9); ctx.lineTo(dx + w * 0.4, -4); ctx.fill();
+          }
+          ctx.globalCompositeOperation = 'lighter';
+          glow(ctx, 0, -a.h * 0.3, a.h * 0.6, 'rgba(110,130,255,1)', 0.5 * fade);
+          ctx.restore();
+        },
+      });
     }
 
     bolt(x, y, color) {

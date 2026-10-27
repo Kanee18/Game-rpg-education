@@ -30,6 +30,11 @@ CONFIG = {
         "bg": (46, 150, 1746, 1126),
         "fg": (46, 1360, 1746, 2324),
     },
+    # lembar terpisah: seluruh gambar dipakai (tanpa kotak potong)
+    "stage2": {
+        "bg_file": "stage2-gua-bg.jpg",
+        "fg_file": "stage2-gua-fg.jpg",
+    },
 }
 
 
@@ -62,6 +67,18 @@ def remove_checker(rgb):
         checker = np.zeros(n + 1, bool)
         checker[1:] = (size > 25) & ((bright > 0.3) | ((bright > 0.1) & (grey > 0.25)))
         bg |= checker[lab]
+    # Kotak catur sisa yang sedikit ternoda cahaya (mis. pendar kristal) ikut dibuang:
+    # tumbuhkan latar ke piksel sangat terang & hampir netral, lalu ke kotak abu (~188).
+    chroma = mx - mn
+    light_sq = (mn > 222) & (chroma < 45)
+    bg = ndi.binary_propagation(bg, mask=bg | light_sq)
+    grey_sq = (mn > 158) & (mn < 200) & (chroma < 10)
+    for _ in range(20):
+        nb = ndi.binary_dilation(bg) & grey_sq & ~bg
+        if not nb.any():
+            break
+        bg |= nb
+    bg = ndi.binary_propagation(bg, mask=bg | light_sq)
     # Buang pulau kecil yang tersisa di bagian atas (bayangan samar)
     fgm = ~bg
     lab2, n2 = ndi.label(fgm)
@@ -81,13 +98,17 @@ def remove_checker(rgb):
 
 
 def process(name, cfg, debug):
-    sheet = Image.open(os.path.join(SRC, cfg["file"])).convert("RGB")
     os.makedirs(OUT, exist_ok=True)
-    bg = fit_16_9(sheet.crop(cfg["bg"]))
+    if "file" in cfg:
+        sheet = Image.open(os.path.join(SRC, cfg["file"])).convert("RGB")
+        bg_src, fg_src = sheet.crop(cfg["bg"]), sheet.crop(cfg["fg"]) if cfg.get("fg") else None
+    else:
+        bg_src = Image.open(os.path.join(SRC, cfg["bg_file"])).convert("RGB")
+        fg_src = Image.open(os.path.join(SRC, cfg["fg_file"])).convert("RGB") if cfg.get("fg_file") else None
+    bg = fit_16_9(bg_src)
     bg.save(os.path.join(OUT, f"{name}_bg.webp"), "WEBP", quality=86, method=6)
-    if cfg.get("fg"):
-        part = sheet.crop(cfg["fg"])
-        rgb = np.asarray(part).astype(np.int16)
+    if fg_src is not None:
+        rgb = np.asarray(fg_src).astype(np.int16)
         a = remove_checker(rgb)
         fg = Image.fromarray(np.dstack([rgb.astype(np.uint8), a]), "RGBA")
         fg = fit_16_9(fg)

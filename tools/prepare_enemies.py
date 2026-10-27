@@ -41,6 +41,23 @@ CONFIG = {
             "defeat": (570, 300, 1010, 538),
         },
     },
+    "golem": {
+        "file": "stage2-golem.jpg",
+        "flip": True,
+        "target_h": 340,
+        # teks label yang menempel di dekat pose dihapus dulu
+        "erase": [(474, 334, 550, 369)],
+        # lembar ini tidak punya pose idle: dibuat dari pose serangan tanpa
+        # ledakan kristal di tanah (hanya komponen badan utama)
+        "frames": {
+            "idle": {"from": (70, 55, 490, 302), "main_only": True,
+                     # area ledakan di sekitar tinju & retakan tanah
+                     "clean_box": (200, 140, 420, 260), "cut_below": 238},
+            "attack": {"from": (70, 55, 490, 302), "ground_y": 238},
+            "skill": (595, 68, 950, 362),
+            "defeat": {"from": (262, 336, 732, 546), "drop_islands": True, "glow_near_body": 14},
+        },
+    },
 }
 
 
@@ -99,16 +116,70 @@ def extract(rgb):
 
 def process(eid, cfg, debug):
     sheet = Image.open(os.path.join(SRC, cfg["file"])).convert("RGB")
+    arr = np.asarray(sheet).copy()
+    for (x0, y0, x1, y1) in cfg.get("erase", []):
+        reg = arr[y0:y1, x0:x1].astype(int)
+        # teks hitam/putih netral -> jadikan latar terang netral
+        neutral = (reg.max(2) - reg.min(2)) < 40
+        arr[y0:y1, x0:x1][neutral] = 250
+    sheet = Image.fromarray(arr)
     frames = {}
-    for name, box in cfg["frames"].items():
+    for name, spec in cfg["frames"].items():
+        box = spec["from"] if isinstance(spec, dict) else spec
         rgb = np.asarray(sheet.crop(box)).astype(np.int16)
         col, al, body = extract(rgb)
+        if isinstance(spec, dict) and spec.get("cut_below"):
+            body[spec["cut_below"]:] = False
+            al[spec["cut_below"]:] = 0
+        if isinstance(spec, dict) and spec.get("drop_islands"):
+            lab, n = ndi.label(body)
+            if n:
+                sizes = np.bincount(lab.ravel()); sizes[0] = 0
+                main = lab == sizes.argmax()
+                near = ndi.binary_dilation(main, iterations=25)
+                ok = np.zeros(n + 1, bool)
+                ok[np.unique(lab[near])] = True
+                ok[0] = False
+                body = ok[lab]
+        if isinstance(spec, dict) and spec.get("glow_near_body"):
+            near = ndi.binary_dilation(body, iterations=spec["glow_near_body"])
+            al = np.where(near, al, 0).astype(np.uint8)
+        if isinstance(spec, dict) and spec.get("main_only"):
+            lab, n = ndi.label(body)
+            if n:
+                sizes = np.bincount(lab.ravel()); sizes[0] = 0
+                main = lab == sizes.argmax()
+                main = ndi.binary_fill_holes(main)
+                # buang pecahan ledakan yang menempel: opening besar lalu kembalikan detail
+                core = ndi.binary_opening(main, iterations=4)
+                lab2, _ = ndi.label(core)
+                s2 = np.bincount(lab2.ravel()); s2[0] = 0
+                core = lab2 == s2.argmax()
+                grow = ndi.binary_dilation(core, iterations=5)
+                if spec.get("clean_box"):
+                    # di sekitar tinju hanya bentuk padat yang dipertahankan (pecahan dibuang)
+                    x0, y0, x1, y1 = spec["clean_box"]
+                    grow[y0:y1, x0:x1] = ndi.binary_dilation(core, iterations=1)[y0:y1, x0:x1]
+                main &= grow
+                body = main
+                keep = ndi.binary_dilation(main, iterations=8)
+                if spec.get("clean_box"):
+                    keep[y0:y1, x0:x1] = False
+                al = np.where(main, al, np.where(keep, (al * 0.5).astype(np.uint8), 0)).astype(np.uint8)
+        # efek cahaya memudar mendekati tepi kotak potong (hindari tepi lurus)
+        hgt, wid = al.shape
+        yy, xx = np.mgrid[0:hgt, 0:wid]
+        edge_d = np.minimum.reduce([yy, xx, hgt - 1 - yy, wid - 1 - xx]).astype(float)
+        fade = np.clip(edge_d / 28.0, 0, 1)
+        al = np.where(body, al, (al * fade)).astype(np.uint8)
         im = Image.fromarray(np.dstack([col, al]), "RGBA")
         bb = Image.fromarray(al).point(lambda v: 255 if v > 10 else 0).getbbox()
         im = im.crop(bb)
         b = body[bb[1]:bb[3], bb[0]:bb[2]]
         ys = np.where(b.sum(1) >= 3)[0]
         ay = float(ys.max()) if len(ys) else im.height - 1
+        if isinstance(spec, dict) and spec.get("ground_y"):
+            ay = float(spec["ground_y"] - bb[1])   # garis tanah tetap (retakan ada di bawahnya)
         xs = np.where(b.any(0))[0]
         ax = float((xs.min() + xs.max()) / 2) if len(xs) else im.width / 2
         if cfg.get("flip"):
@@ -116,6 +187,7 @@ def process(eid, cfg, debug):
             ax = im.width - ax
         frames[name] = {"img": im, "ax": ax, "ay": ay}
     s = cfg["target_h"] / frames["idle"]["img"].height
+    s = min(s, 1.6)
     # skala sumber kecil boleh diperbesar sedikit; simpan dalam resolusi target
     items = []
     for name, f in frames.items():
