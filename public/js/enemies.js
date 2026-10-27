@@ -621,21 +621,7 @@
     }
     drawFrame(ctx, s, pose, H);
     ctx.restore();
-    if (pose === 'skill') {
-      // tanduk cahaya di kepala yang mendongak
-      ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = `rgba(240,210,255,${0.6 + 0.4 * pul})`; ctx.lineWidth = 5; ctx.lineCap = 'round';
-      const hx = -40, hy = -H * 1.02;
-      ctx.beginPath();
-      for (const sgn of [-1, 1]) {
-        ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + sgn * 50, hy - 50, hx + sgn * 90, hy - 110);
-        ctx.moveTo(hx + sgn * 40, hy - 45); ctx.lineTo(hx + sgn * 75, hy - 50);
-        ctx.moveTo(hx + sgn * 65, hy - 80); ctx.lineTo(hx + sgn * 40, hy - 105);
-      }
-      ctx.stroke();
-      glow(ctx, hx, hy - 60, 110, 'rgba(220,170,255,1)', 0.5);
-      ctx.restore();
-    }
+    if (pose === 'skill') glow(ctx, -40, -H * 1.15, 120, 'rgba(230,180,255,1)', 0.35 + 0.2 * pul); // pendar tanduk
   }
 
   function golem(ctx, st) {

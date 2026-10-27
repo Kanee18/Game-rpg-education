@@ -51,7 +51,7 @@ def fit_16_9(im):
 
 
 def remove_checker(rgb):
-    """Kembalikan alpha (0..255) dengan membuang pola papan catur abu-putih."""
+    """Kembalikan (warna, alpha) dengan membuang pola papan catur abu-putih."""
     mn, mx = rgb.min(2), rgb.max(2)
     cand = ((mx - mn) < 22) & (mn > 170)
     lab, n = ndi.label(cand)
@@ -79,6 +79,14 @@ def remove_checker(rgb):
             break
         bg |= nb
     bg = ndi.binary_propagation(bg, mask=bg | light_sq)
+    # Kotak catur yang diwarnai pendar (chroma sedang) di dekat latar juga dibuang
+    tinted = (mn > 146) & (chroma < 48)
+    for _ in range(30):
+        nb = ndi.binary_dilation(bg) & tinted & ~bg
+        if not nb.any():
+            break
+        bg |= nb
+    bg = ndi.binary_propagation(bg, mask=bg | light_sq)
     # Buang pulau kecil yang tersisa di bagian atas (bayangan samar)
     fgm = ~bg
     lab2, n2 = ndi.label(fgm)
@@ -94,7 +102,21 @@ def remove_checker(rgb):
     alpha[edge] = 1 - 0.8 * light[edge]
     alpha = ndi.gaussian_filter(alpha, 0.7)
     alpha[~ndi.binary_dilation(fgm, iterations=1)] = 0
-    return (np.clip(alpha, 0, 1) * 255).astype(np.uint8)
+    # Pendar warna di atas papan catur dibuat ulang sebagai cahaya lembut tanpa pola
+    rgbf = rgb.astype(float)
+    cvec = rgbf - rgbf.mean(2, keepdims=True)
+    cm = np.sqrt((cvec ** 2).sum(2))
+    ga = np.clip((ndi.gaussian_filter(cm, 4) - 14) / 50.0, 0, 0.8)
+    ga[fgm] = 0
+    ga[~ndi.binary_dilation(fgm, iterations=60)] = 0
+    with np.errstate(invalid="ignore", divide="ignore"):
+        dirv = np.where(cm[..., None] > 1e-3, cvec / cm[..., None], 0)
+    dirv = np.stack([ndi.gaussian_filter(dirv[..., i], 4) for i in range(3)], 2)
+    gcol = np.clip(190 + dirv * 90, 0, 255)
+    glow_px = ga > alpha
+    color = np.where(glow_px[..., None], gcol, rgbf).astype(np.uint8)
+    alpha = np.maximum(alpha, ga)
+    return color, (np.clip(alpha, 0, 1) * 255).astype(np.uint8)
 
 
 def process(name, cfg, debug):
@@ -109,8 +131,8 @@ def process(name, cfg, debug):
     bg.save(os.path.join(OUT, f"{name}_bg.webp"), "WEBP", quality=86, method=6)
     if fg_src is not None:
         rgb = np.asarray(fg_src).astype(np.int16)
-        a = remove_checker(rgb)
-        fg = Image.fromarray(np.dstack([rgb.astype(np.uint8), a]), "RGBA")
+        col, a = remove_checker(rgb)
+        fg = Image.fromarray(np.dstack([col, a]), "RGBA")
         fg = fit_16_9(fg)
         fg.save(os.path.join(OUT, f"{name}_fg.webp"), "WEBP", quality=86, method=6)
         if debug:

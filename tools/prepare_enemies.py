@@ -32,6 +32,7 @@ CONFIG = {
     "wolf": {
         "file": "stage1-serigala.jpg",
         "flip": True,           # sumber menghadap kanan, di game musuh menghadap kiri
+        "thin_glow": ("attack", "skill"),   # pose dengan garis cahaya putih tipis
         "target_h": 300,        # tinggi frame idle di atlas
         # kotak tiap pose (x0, y0, x1, y1) — di atas teks label
         "frames": {
@@ -61,7 +62,7 @@ CONFIG = {
 }
 
 
-def extract(rgb):
+def extract(rgb, thin_glow=False):
     rgbf = rgb.astype(float)
     mn, mx = rgb.min(2), rgb.max(2)
     dark = mx < 95
@@ -97,7 +98,19 @@ def extract(rgb):
     a = ndi.gaussian_filter(a, 1.2)
     # inti cahaya putih (mis. sabetan cakar) di tengah area yang sudah bercahaya
     near = ndi.gaussian_filter(a, 3)
-    core = (mn > 232) & (near > 0.55) & ~body
+    # garis cahaya putih yang tipis (tanduk cahaya, sabetan cakar): terang, berada di
+    # area bercahaya, dan hilang bila dibuka 9x9 -> bukan kotak catur (kotak ~17 px)
+    bright = (mn > 200) & ~body
+    thin = bright & ~ndi.binary_opening(bright, structure=np.ones((9, 9)))
+    thin = ndi.binary_opening(thin, structure=np.ones((2, 2)))
+    lab_t, n_t = ndi.label(thin)
+    if n_t:
+        # buang serpihan kecil (tepi kotak catur yang terpotong pendar)
+        sz = np.bincount(lab_t.ravel()); sz[0] = 0
+        ok = sz >= 40
+        thin = ok[lab_t]
+    core = ((mn > 232) & (near > 0.55) & ~body) | ((thin & (near > 0.25)) if thin_glow else False)
+    core = ndi.binary_dilation(core) & (mn > 185) & ~body
     # warna efek: arah chroma dengan saturasi tetap, kecerahan dasar 175
     with np.errstate(invalid="ignore", divide="ignore"):
         dirv = np.where(chroma[..., None] > 1e-3, chroma_vec / chroma[..., None], 0)
@@ -127,7 +140,7 @@ def process(eid, cfg, debug):
     for name, spec in cfg["frames"].items():
         box = spec["from"] if isinstance(spec, dict) else spec
         rgb = np.asarray(sheet.crop(box)).astype(np.int16)
-        col, al, body = extract(rgb)
+        col, al, body = extract(rgb, thin_glow=name in cfg.get("thin_glow", ()))
         if isinstance(spec, dict) and spec.get("cut_below"):
             body[spec["cut_below"]:] = False
             al[spec["cut_below"]:] = 0
