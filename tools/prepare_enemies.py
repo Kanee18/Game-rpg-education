@@ -29,6 +29,36 @@ OUT = os.path.join(ROOT, "public", "assets", "enemies")
 DEBUG_DIR = os.path.join(ROOT, "tools", "_debug")
 
 CONFIG = {
+    # Boss Stage 3: satu lembar berisi dua fase. "ref" = ukuran acuan koordinat;
+    # kotak diskalakan otomatis bila lembar sumber beresolusi lain.
+    "lavaknight": {
+        "file": "stage3-boss.jpg",
+        "ref": (768, 1024),
+        "flip": True,
+        "target_h": 360,
+        "frames": {
+            "idle": (50, 36, 195, 262),
+            "idle2": (285, 36, 510, 262),
+            "windup": (525, 36, 735, 262),
+            "attack": {"from": (12, 288, 268, 508), "glow_near_body": 40},
+            "defeat": (272, 326, 484, 508),
+            "transform": (515, 288, 740, 508),
+        },
+    },
+    "hellfire": {
+        "file": "stage3-boss.jpg",
+        "ref": (768, 1024),
+        "flip": True,
+        "target_h": 430,
+        "frames": {
+            "idle": (268, 562, 506, 772),
+            "roar": (8, 562, 266, 772),
+            "attack": (498, 562, 766, 772),
+            "skill": (8, 798, 278, 998),
+            "defeat": (288, 812, 508, 998),
+            "vanish": (528, 818, 748, 998),
+        },
+    },
     "wolf": {
         "file": "stage1-serigala.jpg",
         "flip": True,           # sumber menghadap kanan, di game musuh menghadap kiri
@@ -128,7 +158,18 @@ def extract(rgb, thin_glow=False):
 
 
 def process(eid, cfg, debug):
-    sheet = Image.open(os.path.join(SRC, cfg["file"])).convert("RGB")
+    path = os.path.join(SRC, cfg["file"])
+    if not os.path.exists(path):
+        print(f"  {eid}: lewati (belum ada {cfg['file']})")
+        return
+    sheet = Image.open(path).convert("RGB")
+    if cfg.get("ref"):
+        rw, rh = cfg["ref"]
+        kx, ky = sheet.width / rw, sheet.height / rh
+        sc = lambda b: (round(b[0] * kx), round(b[1] * ky), round(b[2] * kx), round(b[3] * ky))
+        cfg = dict(cfg)
+        cfg["frames"] = {n: ({**f, "from": sc(f["from"])} if isinstance(f, dict) else sc(f)) for n, f in cfg["frames"].items()}
+        cfg["erase"] = [sc(b) for b in cfg.get("erase", [])]
     arr = np.asarray(sheet).copy()
     for (x0, y0, x1, y1) in cfg.get("erase", []):
         reg = arr[y0:y1, x0:x1].astype(int)

@@ -147,7 +147,7 @@ class Room {
     const quota = this.plan[index].count;
     const hpMax = Math.max(50, Math.round(quota * n * BASE_DAMAGE * TARGET_ACCURACY));
     return {
-      index, key: ph.enemy, name: ph.name, title: ph.title, stage: ph.stage, phase: ph.phase || 1,
+      index, key: ph.enemy, name: ph.name, title: ph.title, stage: ph.stage, phase: ph.phase || 1, boss: !!ph.boss,
       hp: hpMax, hpMax, plannedEnd: this.plan[index].end,
     };
   }

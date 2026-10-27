@@ -237,6 +237,8 @@
   const IMAGE_STAGES = {
     '1:1': { bg: '/assets/backgrounds/stage1_bg.webp', fg: '/assets/backgrounds/stage1_fg.webp', fgY: 70, particles: 'fog' },
     '2:1': { bg: '/assets/backgrounds/stage2_bg.webp', fg: '/assets/backgrounds/stage2_fg.webp', fgY: 70, particles: 'mist' },
+    '3:1': { bg: '/assets/backgrounds/stage3_bg.webp', fg: '/assets/backgrounds/stage3_fg.webp', fgY: 70, particles: 'embers' },
+    '3:2': { bg: '/assets/backgrounds/stage3_bg.webp', fg: '/assets/backgrounds/stage3_fg.webp', fgY: 70, particles: 'hellfire' },
   };
   const images = {};
   function img(src) {
@@ -249,13 +251,13 @@
     return im.complete && im.naturalWidth ? im : null;
   }
   Object.values(IMAGE_STAGES).forEach((c) => { img(c.bg); if (c.fg) img(c.fg); });
-  function imageStage(stage, phase) { return IMAGE_STAGES[stage + ':' + (stage === 4 ? phase : 1)]; }
+  function imageStage(stage, phase) { return IMAGE_STAGES[stage + ':' + (stage >= 3 ? phase : 1)]; }
 
   const STAGE_THEME = { 1: 'forest', 2: 'graveyard', 3: 'volcano', 4: 'castle' };
   const cache = {};
 
   function get(stage, phase) {
-    const key = stage + ':' + (stage === 4 ? phase : 1);
+    const key = stage + ':' + (stage >= 3 ? phase : 1);
     if (!cache[key]) {
       const name = STAGE_THEME[stage] || 'forest';
       cache[key] = THEMES[name](phase === 2);

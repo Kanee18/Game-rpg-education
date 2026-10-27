@@ -35,6 +35,10 @@ CONFIG = {
         "bg_file": "stage2-gua-bg.jpg",
         "fg_file": "stage2-gua-fg.jpg",
     },
+    "stage3": {
+        "bg_file": "stage3-benteng-bg.jpg",
+        "fg_file": "stage3-benteng-fg.jpg",
+    },
 }
 
 
@@ -125,6 +129,9 @@ def process(name, cfg, debug):
         sheet = Image.open(os.path.join(SRC, cfg["file"])).convert("RGB")
         bg_src, fg_src = sheet.crop(cfg["bg"]), sheet.crop(cfg["fg"]) if cfg.get("fg") else None
     else:
+        if not os.path.exists(os.path.join(SRC, cfg["bg_file"])):
+            print(f"  {name}: lewati (belum ada {cfg['bg_file']})")
+            return
         bg_src = Image.open(os.path.join(SRC, cfg["bg_file"])).convert("RGB")
         fg_src = Image.open(os.path.join(SRC, cfg["fg_file"])).convert("RGB") if cfg.get("fg_file") else None
     bg = fit_16_9(bg_src)

@@ -10,7 +10,7 @@
   const easeOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
   const easeIn = (x) => { x = clamp(x); return x * x * x; };
   const MELEE = new Set(['ksatria', 'paladin', 'assassin']);
-  const TRAIL_COL = { slash: '255,210,90', fireball: '255,140,40', orb: '255,90,30', holy: '255,240,170', arrow: '140,255,170', dagger: '200,130,255', shockwave: '130,190,255', claw: '200,140,255', shard: '200,140,255', rock: '170,170,200', blob: '170,90,255', boneSlash: '110,200,255' };
+  const TRAIL_COL = { fireWave: '255,130,30', fireClaw: '255,110,40', slash: '255,210,90', fireball: '255,140,40', orb: '255,90,30', holy: '255,240,170', arrow: '140,255,170', dagger: '200,130,255', shockwave: '130,190,255', claw: '200,140,255', shard: '200,140,255', rock: '170,170,200', blob: '170,90,255', boneSlash: '110,200,255' };
   const rand = (a, b) => a + Math.random() * (b - a);
   const glow = (ctx, x, y, r, color, a = 1) => Enemies.glow(ctx, x, y, r, color, a);
 
@@ -50,6 +50,9 @@
       this.impact = 0;                   // impact frame (warna terbalik)
       this.combo = null;
       this.callouts = [];                // teks besar layar (FINISH!, K.O.!)
+      this.warning = null;               // layar peringatan boss
+      this.bossCard = null;              // kartu nama boss
+      this.enraged = false; this.hbT = 0; // boss mengamuk + detak jantung
       this.last = performance.now();
       const loop = (now) => {
         const dt = Math.min(0.05, (now - this.last) / 1000);
@@ -148,11 +151,13 @@
       const def = Enemies.def(info.key, info.phase);
       this.enemy = {
         key: info.key, phase: info.phase || 1, name: info.name, title: info.title, def,
+        boss: !!(info.boss || def.boss),
         hp: info.hp, hpMax: info.hpMax, shownHp: info.hp,
         x: ENEMY_X, y: ENEMY_Y, ox: 0, oy: 0, st: { t: 0, atk: 0, skill: 0, dying: -1 },
         atkT: -1, skillT: -1, hitT: 0, alpha: entrance ? 0 : 1, enter: entrance ? 0 : 1, dying: -1, scale: 1,
       };
       if (info.stage) { this.stage = info.stage; this.phase = info.phase || 1; }
+      this.enraged = false;
     }
 
     enemyHead() {
@@ -352,6 +357,21 @@
             ctx.fillStyle = '#7c3aed'; ctx.strokeStyle = '#1e0533'; ctx.lineWidth = 4;
             ctx.beginPath(); ctx.ellipse(0, 0, 22, 18, self.t * 3, 0, TAU); ctx.fill(); ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(-6, -6, 5, 0, TAU); ctx.fill();
+          } else if (type === 'fireWave') {
+            // gelombang api bulan sabit yang menyapu tanah
+            ctx.rotate(ang);
+            for (let i = 0; i < 4; i++) {
+              ctx.strokeStyle = `rgba(255,${200 - i * 40},${80 - i * 20},${0.95 - i * 0.2})`; ctx.lineWidth = 22 - i * 5;
+              ctx.beginPath(); ctx.arc(-40 - i * 16, 0, 80, -1.2, 1.2); ctx.stroke();
+            }
+            glow(ctx, 0, 0, 120, 'rgba(255,110,20,1)', 0.7);
+          } else if (type === 'fireClaw') {
+            ctx.rotate(ang);
+            for (let i = 0; i < 3; i++) {
+              ctx.strokeStyle = `rgba(255,${190 - i * 30},70,${0.95 - i * 0.2})`; ctx.lineWidth = 10;
+              ctx.beginPath(); ctx.arc(-34, (i - 1) * 26, 66, -1.0, 1.0); ctx.stroke();
+            }
+            glow(ctx, 0, 0, 90, 'rgba(255,90,20,1)', 0.7);
           } else if (type === 'rock') {
             ctx.rotate(self.t * -8);
             ctx.globalCompositeOperation = 'source-over';
@@ -424,6 +444,20 @@
       this.impact = Math.max(0, this.impact - realDt);
       if (this.speed) { this.speed.a += (this.speed.aT - this.speed.a) * Math.min(1, realDt * 8); if (this.speed.aT === 0 && this.speed.a < 0.02) this.speed = null; }
       this.callouts = this.callouts.filter((c) => { c.t += realDt; return c.t < c.dur; });
+      if (this.warning) this.warning.t += realDt;
+      if (this.bossCard) { this.bossCard.t += realDt; if (this.bossCard.t > this.bossCard.dur) this.bossCard = null; }
+      // boss mengamuk saat HP < 35%: aura merah, detak jantung, layar berdenyut
+      const be = this.enemy;
+      if (be && be.boss && be.dying < 0 && be.shownHp > 0 && be.shownHp / be.hpMax < 0.35) {
+        if (!this.enraged) {
+          this.enraged = true;
+          this.callout('BOSS MENGAMUK!', '#f87171', { size: 104, y: H * 0.18, dur: 1.6, sub: 'Serangannya kini lebih ganas — jangan sampai salah!' });
+          Sfx.roar();
+        }
+        be.rageT = Math.max(be.rageT || 0, 0.4);
+        this.hbT -= realDt;
+        if (this.hbT <= 0) { this.hbT = 0.95; Sfx.heartbeat(); this.hurt = Math.max(this.hurt, 0.18); }
+      }
       if (this.combo) { this.combo.t += realDt; this.combo.pop = Math.max(0, this.combo.pop - realDt * 5); if (this.combo.fade && this.combo.t > this.combo.fade) this.combo = null; }
       this.t += dt;
       for (const a of this.actors.values()) {
@@ -512,6 +546,7 @@
       if (this.enemy && this.enemyBarVisible && this.bars < 0.5) this.drawEnemyBar();
       if (this.banner) this.drawBanner();
       if (this.fade > 0.01) { ctx.fillStyle = `rgba(0,0,0,${this.fade})`; ctx.fillRect(0, 0, W, H); }
+      this.drawWarning();
     }
 
     drawActorShadow(a) {
@@ -717,6 +752,31 @@
         if (c.sub) { ctx.font = '800 34px Nunito, sans-serif'; ctx.lineWidth = 7; ctx.strokeText(c.sub, 0, c.size * 0.62); ctx.fillStyle = '#fff'; ctx.fillText(c.sub, 0, c.size * 0.62); }
         ctx.restore();
       }
+      // kartu nama boss: panel miring meluncur dari kiri
+      if (this.bossCard) {
+        const b = this.bossCard;
+        const inK = easeOut(b.t / 0.35), outK = clamp((b.t - (b.dur - 0.4)) / 0.4);
+        ctx.save();
+        ctx.globalAlpha = 1 - outK;
+        ctx.translate(-W * (1 - inK) - outK * 200, 0);
+        ctx.transform(1, 0, -0.18, 1, 0, 0);
+        const y0 = H * 0.62;
+        const gg = ctx.createLinearGradient(0, 0, W * 0.75, 0);
+        gg.addColorStop(0, 'rgba(10,0,0,0.92)'); gg.addColorStop(0.8, 'rgba(40,4,4,0.85)'); gg.addColorStop(1, 'rgba(40,4,4,0)');
+        ctx.fillStyle = gg; ctx.fillRect(80, y0, W * 0.78, 230);
+        ctx.fillStyle = b.color; ctx.fillRect(80, y0, W * 0.7, 6); ctx.fillRect(80, y0 + 224, W * 0.55, 4);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.font = '900 30px Nunito, sans-serif'; ctx.fillStyle = b.color;
+        ctx.fillText(b.kicker, 230, y0 + 44);
+        ctx.font = '900 104px Cinzel, Georgia, serif';
+        ctx.lineWidth = 10; ctx.strokeStyle = '#000'; ctx.strokeText(b.name, 220, y0 + 122);
+        const ng = ctx.createLinearGradient(0, y0 + 70, 0, y0 + 170);
+        ng.addColorStop(0, '#fff7e0'); ng.addColorStop(1, b.color);
+        ctx.fillStyle = ng; ctx.fillText(b.name, 220, y0 + 122);
+        ctx.font = 'italic 800 32px Nunito, sans-serif'; ctx.fillStyle = '#fde68a';
+        ctx.fillText(b.title, 236, y0 + 192);
+        ctx.restore();
+      }
       // impact frame: warna terbalik sesaat (gaya anime)
       if (this.impact > 0) {
         ctx.globalCompositeOperation = 'difference';
@@ -724,6 +784,40 @@
         ctx.globalCompositeOperation = 'source-over';
       }
       ctx.restore();
+    }
+
+      // layar peringatan boss: pita merah berjalan atas-bawah
+    drawWarning() {
+      const ctx = this.ctx;
+      if (this.warning) {
+        ctx.save();
+        const wt = this.warning.t;
+        const a = clamp(wt / 0.25) * (this.warning.out ? clamp(1 - (wt - this.warning.out) / 0.35) : 1);
+        if (a > 0.01) {
+          ctx.globalAlpha = a;
+          const pul = 0.5 + 0.5 * Math.sin(wt * 8);
+          ctx.fillStyle = `rgba(150,0,10,${0.25 + 0.2 * pul})`; ctx.fillRect(0, 0, W, H);
+          for (const [yy, dir] of [[H * 0.3, 1], [H * 0.7, -1]]) {
+            ctx.save();
+            ctx.translate(0, yy);
+            ctx.fillStyle = '#facc15'; ctx.fillRect(0, -48, W, 96);
+            ctx.beginPath(); ctx.rect(0, -48, W, 96); ctx.clip();
+            ctx.fillStyle = '#111';
+            const off = (wt * 260 * dir) % 80;
+            for (let x = -160; x < W + 160; x += 80) { ctx.beginPath(); ctx.moveTo(x + off, -48); ctx.lineTo(x + off + 40, -48); ctx.lineTo(x + off, 48); ctx.lineTo(x + off - 40, 48); ctx.fill(); }
+            ctx.restore();
+          }
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.font = 'italic 900 150px Cinzel, Georgia, serif';
+          ctx.lineWidth = 18; ctx.strokeStyle = '#120000'; ctx.lineJoin = 'round';
+          ctx.strokeText('WARNING', W / 2, H * 0.5);
+          ctx.fillStyle = `rgb(255,${60 + 60 * pul | 0},${60 + 60 * pul | 0})`; ctx.fillText('WARNING', W / 2, H * 0.5);
+          ctx.font = '900 34px Nunito, sans-serif'; ctx.lineWidth = 8;
+          ctx.strokeText(this.warning.text, W / 2, H * 0.5 + 105); ctx.fillStyle = '#fff'; ctx.fillText(this.warning.text, W / 2, H * 0.5 + 105);
+          ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+      }
     }
 
     drawEnemyBar() {
@@ -736,7 +830,14 @@
       ctx.font = '900 28px Cinzel, Georgia, serif'; ctx.fillStyle = '#fde68a'; ctx.textBaseline = 'top';
       ctx.fillText(e.name, x, y);
       ctx.font = '700 18px Nunito, sans-serif'; ctx.fillStyle = '#c4b5fd'; ctx.textAlign = 'right';
-      ctx.fillText(`STAGE ${this.stage}/4${this.stage === 4 ? ` • FASE ${e.phase}` : ''}`, x + w, y + 6);
+      ctx.fillText(`STAGE ${this.stage}/4${e.boss ? ` • FASE ${e.phase}/2` : ''}`, x + w, y + 6);
+      if (e.boss) {
+        const pul = this.enraged ? 0.6 + 0.4 * Math.sin(this.t * 10) : 1;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = this.enraged ? `rgba(248,113,113,${pul})` : '#f97316';
+        ctx.font = '900 16px Nunito, sans-serif';
+        ctx.fillText(this.enraged ? '☠ BOSS • MENGAMUK' : '☠ BOSS', x, y - 26);
+      }
       ctx.textAlign = 'left';
       const by = y + 40;
       ctx.fillStyle = '#1b0f22'; roundRect(ctx, x, by, w, h, 8); ctx.fill();
@@ -746,7 +847,9 @@
       ctx.fillStyle = '#fbbf24'; roundRect(ctx, x, by, w * ghost, h, 8); ctx.fill();
       const g = ctx.createLinearGradient(0, by, 0, by + h);
       g.addColorStop(0, '#f87171'); g.addColorStop(1, '#b91c1c');
+      if (this.enraged) ctx.globalAlpha = 0.75 + 0.25 * Math.sin(this.t * 10);
       ctx.fillStyle = g; roundRect(ctx, x, by, w * bar, h, 8); ctx.fill();
+      ctx.globalAlpha = 1;
       ctx.font = '800 18px Nunito, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(`${Math.max(0, Math.round(e.barHp == null ? e.shownHp : e.barHp))} / ${e.hpMax}`, x + w / 2, by + h / 2 + 1);
       ctx.restore();
@@ -1103,12 +1206,15 @@
       if (!e || !targets.length) return;
       const key = e.key === 'demonking' ? 'demonking' + e.phase : e.key;
       // musuh bersprite memakai skill bila banyak yang salah
-      const SKILL_NAMES = { wolf: 'Lolongan Kristal!', golem: 'Gempa Kristal!' };
-      const useSkill = !!SKILL_NAMES[key] && targets.length >= Math.max(2, this.actors.size * 0.5);
+      const SKILL_NAMES = { wolf: 'Lolongan Kristal!', golem: 'Gempa Kristal!', lavaknight: 'Tebasan Magma!', hellfire: 'Erupsi Neraka!' };
+      const ratio = e.boss ? 0.4 : 0.5;   // boss lebih sering memakai skill, dan selalu saat mengamuk
+      const useSkill = !!SKILL_NAMES[key] && (targets.length >= Math.max(2, this.actors.size * ratio) || (e.boss && this.enraged));
       const sc = e.def.scaleFix || 1;
       const head = this.enemyHead();
       const pc = this.partyCenter();
       this.combo = null;
+      // boss: lingkaran peringatan merah di bawah setiap sasaran
+      const marks = e.boss ? targets.map((t) => this.actors.get(t.id)).filter(Boolean).map((a) => this.warnMark(a)) : [];
 
       // 1) TELEGRAPH: kamera mendekat ke musuh, aura merah, layar berdenyut bahaya
       this.barsT = 1;
@@ -1119,14 +1225,24 @@
         size: useSkill ? 104 : 96, y: H * 0.22, dur: 1.25,
         sub: `${targets.length} petualang menjadi sasaran!`,
       });
-      if (useSkill) {
+      if (useSkill && key === 'lavaknight') {
+        // ksatria lava tidak punya pose skill: angkat pedang lama, lalu hantam
+        e.st.pose = 'idle2';
+        this.speed = { x: head.x, y: head.y, color: '255,120,30', a: 0, aT: 0.85 };
+        Sfx.charge(); Sfx.rumble(); this.shake = 18;
+        await this.wait(800);
+        e.st.pose = null;
+        e.atkT = 0.4; e.atkDur = 0.9;
+        Sfx.enemyAttack();
+        await this.wait(250);
+      } else if (useSkill) {
         e.skillT = 0; e.skillDur = 1.7;
         this.speed = { x: head.x, y: head.y, color: '190,120,255', a: 0, aT: 0.8 };
         Sfx.roar(); this.shake = key === 'golem' ? 26 : 16;
         await this.wait(950);
       } else {
         await this.wait(480);
-        e.atkT = 0; e.atkDur = 1.0;
+        e.atkT = 0; e.atkDur = e.boss ? 1.3 : 1.0;
         Sfx.enemyAttack();
         await this.wait(360);
       }
@@ -1134,6 +1250,7 @@
       // 2) RELEASE: whip-pan cepat ke party, serangan meluncur
       e.rageT = 0; this.dangerT = 0;
       if (this.speed) this.speed.aT = 0;
+      marks.forEach((m) => { m.done = true; });
       this.focus(pc + 80, 760, 1.1, 11);
       let firstHit = true, koCount = 0;
       const proms = targets.map((t, i) => new Promise((res) => {
@@ -1168,6 +1285,12 @@
           } else if (key === 'golem') {
             if (useSkill) this.crystalSpike(a, doHit);
             else this.projectile('rock', { x: head.x - 200, y: e.y - 40 }, to, 0.45, doHit);
+          } else if (key === 'lavaknight') {
+            if (useSkill) this.lavaGeyser(a, doHit, '255,120,30');
+            else this.projectile('fireWave', { x: e.x - 180, y: e.y - 30 }, { x: a.x, y: a.y - a.h * 0.3 }, 0.4, doHit);
+          } else if (key === 'hellfire') {
+            if (useSkill) { this.lavaGeyser(a, doHit, '255,80,20'); if (i % 2 === 0) this.skyFire(a, () => {}); }
+            else this.projectile('fireClaw', { x: head.x - 200, y: head.y + 20 }, to, 0.34, doHit);
           } else if (key === 'slime') this.projectile('blob', { x: head.x - 80, y: head.y }, to, 0.5, doHit);
           else if (key === 'skeleton') this.projectile('boneSlash', { x: head.x - 120, y: head.y }, to, 0.38, doHit);
           else if (key === 'general') this.projectile('orb', { x: head.x - 150, y: head.y + 40 }, to, 0.42, doHit);
@@ -1206,6 +1329,59 @@
       this.callout('FINISH!', '#fde047', { size: 170, dur: 1.7, sub: `${e.name} tumbang!` });
       Sfx.boom(); Sfx.crit();
       await this.wait(420);
+    }
+
+    // Lingkaran bahaya berdenyut di tanah di bawah karakter (telegraph boss)
+    warnMark(a) {
+      const self = this;
+      const m = {
+        t: 0, dur: 99, layer: 'back', done: false,
+        update() { return !this.done; },
+        draw(ctx) {
+          const k = clamp(this.t / 0.3);
+          const pul = 0.6 + 0.4 * Math.sin(self.t * 16);
+          ctx.save();
+          ctx.translate(a.x, a.y + 4);
+          ctx.scale(1, 0.32);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = `rgba(255,40,40,${0.9 * pul * k})`; ctx.lineWidth = 8;
+          ctx.beginPath(); ctx.arc(0, 0, a.h * 0.42 * (1.4 - 0.4 * k), 0, TAU); ctx.stroke();
+          ctx.fillStyle = `rgba(255,30,30,${0.22 * pul * k})`;
+          ctx.beginPath(); ctx.arc(0, 0, a.h * 0.42, 0, TAU); ctx.fill();
+          ctx.restore();
+        },
+      };
+      this.fx.push(m);
+      return m;
+    }
+
+    // Semburan lava dari tanah di bawah karakter
+    lavaGeyser(a, cb, rgb = '255,110,20') {
+      const self = this;
+      let hit = false;
+      Sfx.fire();
+      this.fx.push({
+        t: 0, dur: 1.0, layer: 'front',
+        update() {
+          if (this.t > 0.22 && !hit) { hit = true; self.shake = Math.max(self.shake, 14); cb(); }
+          if (this.t < 0.6) for (let i = 0; i < 3; i++) self.particles.push({ x: a.x + rand(-30, 30), y: a.y, vx: rand(-90, 90), vy: -rand(500, 900), life: 0, max: rand(0.4, 0.7), size: rand(6, 12), color: Math.random() < 0.5 ? rgb : '255,210,90', grav: 1400 });
+        },
+        draw(ctx) {
+          const k = this.t / this.dur;
+          const grow = k < 0.25 ? easeOut(k / 0.25) : 1;
+          const fade = k > 0.55 ? 1 - (k - 0.55) / 0.45 : 1;
+          const hh = a.h * 1.5 * grow, w = a.h * 0.32;
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = fade;
+          const g = ctx.createLinearGradient(0, a.y - hh, 0, a.y);
+          g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.3, `rgba(${rgb},0.9)`); g.addColorStop(1, 'rgba(255,230,140,1)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.moveTo(a.x - w, a.y); ctx.quadraticCurveTo(a.x - w * 0.4, a.y - hh * 0.6, a.x, a.y - hh);
+          ctx.quadraticCurveTo(a.x + w * 0.4, a.y - hh * 0.6, a.x + w, a.y); ctx.closePath(); ctx.fill();
+          glow(ctx, a.x, a.y - 20, a.h * 0.7, `rgba(${rgb},1)`, 0.7 * fade);
+          ctx.restore();
+        },
+      });
     }
 
     // Paku kristal muncul dari tanah di bawah karakter
@@ -1263,6 +1439,22 @@
 
     async enemyDeath() {
       const e = this.enemy; if (!e) return;
+      e.st.pose = null;
+      if (e.boss) {
+        // ledakan beruntun di tubuh boss sebelum tumbang
+        this.barsT = 1;
+        this.focus(e.x - 40, e.y - 200, 1.25, 3);
+        for (let i = 0; i < 6; i++) {
+          const p = this.enemyHead();
+          const x = p.x + rand(-160, 120), y = p.y + rand(-200, 160);
+          this.burst(x, y, i % 2 ? '255,200,120' : '255,110,40', 30, 700, 10);
+          this.sparks(x, y, '255,230,180', 16, 1200, null, true);
+          this.flash = 0.4; this.flashColor = '255,200,150';
+          this.shake = 24; e.hitT = 1;
+          Sfx.boom();
+          await this.wait(230);
+        }
+      }
       Sfx.boom();
       this.shake = 30;
       await this.tween(1700, (k) => { e.dying = k; this.shake = Math.max(this.shake, 14 * (1 - k)); });
@@ -1297,38 +1489,134 @@
       this.fadeTarget = 1;
       await walk;
       await this.wait(300);
-      this.setEnemy(next, { entrance: true });
       this.scroll = 0;
+      if (next.boss) { await this.bossIntro(next); return; }
+      this.setEnemy(next, { entrance: true });
       this.fadeTarget = 0;
       await this.wait(500);
       await this.enemyEntrance();
     }
 
-    async bossPhase2(next) {
-      const e = this.enemy;
-      this.showBanner('', 'Raja Iblis tumbang…?', '#f87171', 1600);
-      await this.wait(1800);
-      // kebangkitan
-      Sfx.roar();
-      this.dimTarget = 0.5;
-      for (let i = 0; i < 6; i++) {
-        this.bolt(e.x + rand(-300, 300), e.y, '255,60,40');
-        this.shake = 26;
-        this.flash = 0.35; this.flashColor = '255,40,30';
-        await this.wait(260);
-      }
+    // ================================================================ INTRO BOSS
+    // Layar WARNING -> kamera menyapu benteng -> bumi bergetar -> boss muncul dari
+    // pilar api -> close-up + raungan -> kartu nama -> kamera mundur ke posisi tempur.
+    async bossIntro(next) {
+      const color = next.key === 'demonking' ? '#c084fc' : '#f97316';
+      const rgb = next.key === 'demonking' ? '190,110,255' : '255,120,30';
+      // 1) peringatan di layar hitam
+      this.enemyBarVisible = false;
+      this.warning = { t: 0, text: `Boss Stage ${next.stage} mendekat — bersiaplah, para petualang!` };
+      Sfx.alarm(); this.after(900, () => Sfx.alarm());
+      Sfx.heartbeat(); this.after(700, () => Sfx.heartbeat());
+      await this.wait(1900);
+      this.warning.out = this.warning.t;
+      // 2) kamera melayang tinggi di atas medan, lalu turun perlahan
       this.setEnemy(next, { entrance: false });
-      this.phase = 2;
-      const ne = this.enemy;
-      ne.scale = 0.4; ne.alpha = 0;
+      const e = this.enemy;
+      e.alpha = 0;
+      this.barsT = 1;
+      this.cam = { x: W * 0.62, y: H * 0.32, z: 1.45 };
+      this.focus(W * 0.62, H * 0.32, 1.45, 30);
+      this.fadeTarget = 0;
+      await this.wait(400);
+      this.warning = null;
+      this.focus(ENEMY_X - 120, 640, 1.25, 0.9);
+      Sfx.rumble();
+      await this.tween(1800, (k) => {
+        this.shake = 3 + 12 * k;
+        if (Math.random() < 0.5) this.emit(ENEMY_X + rand(-300, 200), ENEMY_Y + rand(-20, 20), rgb, rand(4, 9), rand(-40, 40), -rand(120, 360), 0.9);
+      });
+      // 3) boss muncul dari pilar api + gelombang kejut
+      const p = this.pillar(e.x, rgb, 900, 300);
+      Sfx.fire();
+      await this.wait(260);
+      e.alpha = 1; e.squash = 1;
+      this.impactFrame(100);
+      this.hitStop(120);
+      this.flash = 0.75; this.flashColor = '255,230,200';
+      this.shake = 34;
+      this.ring(e.x, ENEMY_Y, rgb, 520);
+      this.burst(e.x, ENEMY_Y - 40, rgb, 60, 900, 12);
+      for (const a of this.actors.values()) { a.ox = -rand(20, 40); a.flash = 0.4; }   // party terdorong angin
       Sfx.boom();
-      await this.tween(1300, (k) => { ne.scale = 0.4 + 0.6 * easeOut(k); ne.alpha = k; this.shake = 18 * (1 - k) + 4; });
-      this.flash = 0.9; this.flashColor = '255,120,60';
-      this.burst(ne.x, ne.y - 400, '255,120,40', 100, 1200, 14);
-      this.dimTarget = 0;
-      this.showBanner('FASE 2', 'RAJA IBLIS BANGKIT!', '#fb923c', 2600, 'Azaroth menunjukkan wujud sejatinya!');
+      await p;
+      // 4) close-up raungan
+      const head = this.enemyHead();
+      this.focus(head.x + 20, head.y + 40, 1.55, 6);
+      e.st.pose = next.key === 'lavaknight' ? 'idle2' : 'roar';
+      e.skillT = 0; e.skillDur = 1.6;
+      this.speed = { x: head.x, y: head.y, color: rgb, a: 0, aT: 0.9 };
       Sfx.roar();
-      await this.wait(2200);
+      this.shake = 22;
+      this.slowMo(0.6, 700);
+      await this.wait(1000);
+      // 5) kartu nama
+      this.speed.aT = 0;
+      this.bossCard = { t: 0, dur: 2.8, name: next.name, title: next.title, kicker: `☠  BOSS  •  STAGE ${next.stage}`, color };
+      Sfx.boom();
+      await this.wait(2400);
+      e.st.pose = null;
+      // 6) kembali ke posisi tempur
+      this.barsT = 0;
+      this.resetCam(1.8);
+      this.enemyBarVisible = true;
+      await this.wait(700);
+    }
+
+    // ================================================================ TRANSFORMASI BOSS
+    // Boss tumbang -> hening + detak jantung -> "Belum berakhir!" -> kebangkitan -> fase 2.
+    async bossTransform(next) {
+      const e = this.enemy;
+      const toLava = next.key === 'hellfire';
+      const rgb = toLava ? '255,110,20' : '255,60,40';
+      // 1) tumbang
+      e.st.pose = 'defeat';
+      this.barsT = 1;
+      const head = this.enemyHead();
+      this.focus(e.x - 40, e.y - 140, 1.3, 2);
+      this.callout('…', '#e5e7eb', { size: 160, y: H * 0.36, dur: 1.4 });
+      Sfx.heartbeat(); await this.wait(900);
+      Sfx.heartbeat(); this.dimTarget = 0.35; await this.wait(800);
+      // 2) belum berakhir: retakan lava, kamera mendekat, getaran membesar
+      this.callout('BELUM BERAKHIR!', '#fca5a5', { size: 120, y: H * 0.28, dur: 1.8 });
+      Sfx.heartbeat(); Sfx.rumble();
+      e.rageT = 1; this.dangerT = 0.8;
+      if (e.def.sprite && Enemies.def(e.key).sprite) e.st.pose = toLava ? 'transform' : 'defeat';
+      this.focus(head.x, head.y + 60, 1.5, 1.6);
+      await this.tween(1800, (k) => {
+        this.shake = 4 + 22 * k;
+        for (let i = 0; i < 3; i++) this.emit(e.x + rand(-160, 160), e.y - rand(0, 420 * k), rgb, rand(6, 13), 0, -rand(150, 420), 0.8);
+        if (!toLava && Math.random() < 0.08) this.bolt(e.x + rand(-300, 300), e.y, rgb);
+      });
+      // 3) ledakan kebangkitan
+      this.impactFrame(120);
+      this.hitStop(160);
+      this.flash = 1; this.flashColor = toLava ? '255,170,80' : '255,80,60';
+      this.setEnemy(next, { entrance: false });
+      const ne = this.enemy;
+      ne.rageT = 1;
+      ne.st.pose = 'roar';
+      ne.scale = 0.6;
+      this.dimTarget = 0; this.dangerT = 0;
+      this.ring(ne.x, ENEMY_Y, rgb, 700);
+      this.burst(ne.x, ne.y - 300, rgb, 110, 1300, 14);
+      for (const a of this.actors.values()) { a.ox = -rand(40, 70); a.flash = 0.6; }
+      Sfx.boom(); Sfx.roar();
+      const nh = this.enemyHead();
+      this.focus(nh.x, nh.y + 80, 1.35, 5);
+      this.speed = { x: nh.x, y: nh.y, color: rgb, a: 0, aT: 1 };
+      this.slowMo(0.45, 900);
+      this.callout('FASE 2', '#fb923c', { size: 170, y: H * 0.3, dur: 1.8 });
+      await this.tween(1100, (k) => { ne.scale = 0.6 + 0.4 * easeOut(k); this.shake = 26 * (1 - k) + 6; });
+      await this.wait(500);
+      this.speed.aT = 0;
+      this.bossCard = { t: 0, dur: 2.6, name: next.name, title: next.title, kicker: `☠  BOSS  •  FASE 2`, color: toLava ? '#ef4444' : '#fb923c' };
+      Sfx.boom();
+      await this.wait(2300);
+      ne.st.pose = null; ne.rageT = 0;
+      this.barsT = 0;
+      this.resetCam(1.8);
+      await this.wait(600);
     }
 
     // Animasi lengkap satu soal
@@ -1397,11 +1685,12 @@
 
       if (payload.enemy.defeated) {
         await this.finisher();
-        await this.enemyDeath();
+        const sameStage = payload.next && payload.next.stage === this.stage;   // boss berganti fase
+        if (!sameStage) await this.enemyDeath();
         this.barsT = 0;
         this.resetCam(2);
         if (payload.next) {
-          if (payload.next.key === 'demonking' && payload.next.phase === 2) await this.bossPhase2(payload.next);
+          if (sameStage) await this.bossTransform(payload.next);
           else await this.transitionTo(payload.next);
           for (const a of this.actors.values()) { a.hp = 100; a.ko = false; }
         }

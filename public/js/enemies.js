@@ -653,7 +653,74 @@
     }
   }
 
+  // ------------------------------------------------------------------ boss Stage 3
+  // Pose dipilih dari status: transform/roar (sinematik), dying (defeat -> vanish),
+  // skill, atk (ancang-ancang -> serang), idle (bergantian siaga 1/2 bila ada).
+  function bossPose(s, st) {
+    const F = s.meta.frames;
+    if (st.pose && F[st.pose]) return st.pose;          // pose paksa untuk adegan sinematik
+    if (st.dying >= 0.12) return F.vanish && st.dying > 0.55 ? 'vanish' : 'defeat';
+    if (st.transform && F.transform) return 'transform';
+    if (st.roar && F.roar) return 'roar';
+    if (st.skill > 0 && F.skill) return 'skill';
+    if (st.atk > 0) {
+      if (st.atk < 0.42 && F.windup) return 'windup';
+      if (st.atk < 0.85) return 'attack';
+    }
+    if (F.idle2 && Math.floor(st.t / 1.8) % 2 === 1) return 'idle2';
+    return 'idle';
+  }
+
+  function lavaKnight(ctx, st) {
+    const s = sheetReady('lavaknight');
+    if (!s) { ctx.save(); ctx.scale(0.72, 0.72); general(ctx, st); ctx.restore(); return; }   // cadangan
+    const t = st.t, H = DEFS.lavaknight.height;
+    const pose = bossPose(s, st);
+    const pul = 0.5 + 0.5 * Math.sin(t * 3.3);
+    shadow(ctx, pose === 'defeat' ? 230 : 170);
+    // panas membara di kaki & retakan zirah
+    if (pose !== 'defeat') glow(ctx, 0, -12, 210, 'rgba(255,90,20,1)', 0.22 + 0.15 * pul);
+    if (pose === 'transform') glow(ctx, 0, -H * 0.5, 380, 'rgba(255,120,30,1)', 0.6 + 0.3 * pul);
+    ctx.save();
+    if (pose === 'idle' || pose === 'idle2') { const b = Math.sin(t * 2); ctx.translate(0, b * 1.5); ctx.scale(1, 1 + 0.008 * b); }
+    if (pose === 'windup' || pose === 'transform') ctx.translate(Math.sin(t * 50) * 3, 0);
+    drawFrame(ctx, s, pose, H);
+    ctx.restore();
+    // bara api naik dari zirah
+    if (pose !== 'defeat') {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 8; i++) {
+        const p = (t * 0.55 + i / 8) % 1;
+        const x = Math.sin(i * 5.7 + t) * 70, y = -H * (0.25 + 0.75 * p);
+        ctx.fillStyle = `rgba(255,${140 + (i % 3) * 30},40,${0.8 * (1 - p)})`;
+        ctx.fillRect(x, y, 4, 4);
+      }
+      ctx.restore();
+    }
+  }
+
+  function hellfire(ctx, st) {
+    const s = sheetReady('hellfire');
+    if (!s) { ctx.save(); ctx.scale(0.85, 0.85); ctx.filter = 'hue-rotate(-15deg) saturate(1.4)'; general(ctx, st); ctx.restore(); return; }
+    const t = st.t, H = DEFS.hellfire.height;
+    const pose = bossPose(s, st);
+    const pul = 0.5 + 0.5 * Math.sin(t * 2.6);
+    shadow(ctx, pose === 'vanish' ? 160 : 250);
+    if (pose !== 'defeat' && pose !== 'vanish') {
+      glow(ctx, 0, -H * 0.5, 420, 'rgba(255,70,10,1)', 0.25 + 0.15 * pul);       // aura neraka
+      glow(ctx, -10, -H * 0.55, 110, 'rgba(255,200,80,1)', 0.25 + 0.2 * pul);    // inti lava di dada
+    }
+    if (pose === 'roar' || pose === 'skill') glow(ctx, 0, -H * 0.5, 520, 'rgba(255,110,20,1)', 0.45 + 0.25 * pul);
+    ctx.save();
+    if (pose === 'idle') { const b = Math.sin(t * 1.6); ctx.translate(0, b * 3); ctx.scale(1, 1 + 0.012 * b); }
+    if (pose === 'roar' || pose === 'skill') ctx.translate(Math.sin(t * 55) * 4, Math.sin(t * 37) * 2);
+    drawFrame(ctx, s, pose, H);
+    ctx.restore();
+  }
+
   const DEFS = {
+    lavaknight: { draw: lavaKnight, height: 360, scaleFix: 1.2, width: 420, hitY: 0.58, color: '#f97316', deathPose: true, sprite: 'lavaknight', boss: true },
+    hellfire: { draw: hellfire, height: 430, scaleFix: 1.25, width: 640, hitY: 0.6, color: '#ef4444', deathPose: true, sprite: 'hellfire', boss: true },
     golem: { draw: golem, height: 340, scaleFix: 1.15, width: 560, hitY: 0.55, color: '#818cf8', deathPose: true, sprite: 'golem' },
     wolf: { draw: wolf, height: 300, scaleFix: 1.12, width: 560, hitY: 0.5, color: '#a78bfa', deathPose: true, sprite: 'wolf' },
     slime: { draw: slime, height: 230, scaleFix: 1.45, width: 330, hitY: 0.45, color: '#a78bfa' },
@@ -670,6 +737,8 @@
 
   loadSheet('wolf');
   loadSheet('golem');
+  loadSheet('lavaknight');
+  loadSheet('hellfire');
 
   window.Enemies = { def, glow, TAU };
 })();

@@ -94,13 +94,15 @@
     },
   ];
 
-  // Urutan musuh: 3 bawahan lalu Raja Iblis (2 fase).
+  // Urutan musuh: 2 penjaga, boss Stage 3 (2 fase), lalu Raja Iblis (2 fase).
+  // boss: true -> intro boss sinematik; fase berikutnya di stage yang sama = transformasi.
   const PHASES = [
-    { enemy: 'wolf', name: 'Serigala Kristal Bayangan', title: 'Penjaga Lembah Berkabut', stage: 1, weight: 0.15, counter: 20 },
-    { enemy: 'golem', name: 'Golem Kristal Purba', title: 'Penjaga Gua Kristal', stage: 2, weight: 0.2, counter: 25 },
-    { enemy: 'general', name: 'Jenderal Iblis Vargoth', title: 'Tangan Kanan Raja Iblis', stage: 3, weight: 0.2, counter: 30 },
-    { enemy: 'demonking', name: 'Raja Iblis Azaroth', title: 'Penguasa Kegelapan', stage: 4, phase: 1, weight: 0.2, counter: 30 },
-    { enemy: 'demonking', name: 'Azaroth — Wujud Sejati', title: 'Fase 2: Kebangkitan', stage: 4, phase: 2, weight: 0.25, counter: 40 },
+    { enemy: 'wolf', name: 'Serigala Kristal Bayangan', title: 'Penjaga Lembah Berkabut', stage: 1, weight: 0.12, counter: 20 },
+    { enemy: 'golem', name: 'Golem Kristal Purba', title: 'Penjaga Gua Kristal', stage: 2, weight: 0.16, counter: 25 },
+    { enemy: 'lavaknight', name: 'Ksatria Iblis Lava', title: 'Penjaga Benteng Neraka', stage: 3, phase: 1, boss: true, weight: 0.15, counter: 30 },
+    { enemy: 'hellfire', name: 'Iblis Api Neraka', title: 'Fase 2: Wujud Api Neraka', stage: 3, phase: 2, boss: true, weight: 0.16, counter: 35 },
+    { enemy: 'demonking', name: 'Raja Iblis Azaroth', title: 'Penguasa Kegelapan', stage: 4, phase: 1, boss: true, weight: 0.18, counter: 35 },
+    { enemy: 'demonking', name: 'Azaroth — Wujud Sejati', title: 'Fase 2: Kebangkitan', stage: 4, phase: 2, boss: true, weight: 0.24, counter: 40 },
   ];
 
   const api = { CHARACTERS, PHASES, MAX_PLAYERS: 20 };
