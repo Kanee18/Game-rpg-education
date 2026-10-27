@@ -574,7 +574,65 @@
     ctx.restore();
   }
 
+  // ------------------------------------------------------------------ musuh bersprite
+  // Atlas dari tools/prepare_enemies.py. Frame: [sx, sy, w, h, anchorX, anchorY]
+  const sheets = {};
+  function loadSheet(id) {
+    if (sheets[id]) return sheets[id];
+    const s = { img: new Image(), meta: null };
+    sheets[id] = s;
+    fetch('/assets/enemies/' + id + '.json').then((r) => r.json()).then((m) => { s.meta = m; }).catch(() => {});
+    s.img.src = '/assets/enemies/' + id + '.webp';
+    return s;
+  }
+  function sheetReady(id) {
+    const s = sheets[id];
+    return s && s.meta && s.img.complete && s.img.naturalWidth ? s : null;
+  }
+
+  function wolf(ctx, st) {
+    const s = sheetReady('wolf');
+    if (!s) return slime(ctx, st);   // cadangan bila gambar belum termuat
+    const t = st.t, H = DEFS.wolf.height;
+    let pose = 'idle';
+    if (st.dying >= 0.12) pose = 'defeat';
+    else if (st.skill > 0) pose = 'skill';
+    else if (st.atk > 0.3 && st.atk < 0.85) pose = 'attack';
+    const f = s.meta.frames[pose];
+    const k = H / s.meta.bodyH;
+    shadow(ctx, pose === 'defeat' ? 230 : 190);
+    // aura kristal di punggung berdenyut
+    const pul = 0.5 + 0.5 * Math.sin(t * 3);
+    if (pose !== 'defeat') glow(ctx, 20, -H * 0.78, 120, 'rgba(180,90,255,1)', 0.18 + 0.14 * pul);
+    if (pose === 'skill') glow(ctx, 0, -H * 0.55, 330, 'rgba(160,70,255,1)', 0.35 + 0.2 * pul);
+    ctx.save();
+    if (pose === 'idle') {
+      const b = Math.sin(t * 2.6);
+      ctx.scale(1 - 0.008 * b, 1 + 0.018 * b);    // bernapas
+    } else if (pose === 'skill') {
+      ctx.translate(Math.sin(t * 40) * 3, 0);        // bergetar saat melolong
+    }
+    ctx.drawImage(s.img, f[0], f[1], f[2], f[3], -f[4] * k, -f[5] * k, f[2] * k, f[3] * k);
+    ctx.restore();
+    if (pose === 'skill') {
+      // tanduk cahaya di kepala yang mendongak
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = `rgba(240,210,255,${0.6 + 0.4 * pul})`; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      const hx = -40, hy = -H * 1.02;
+      ctx.beginPath();
+      for (const sgn of [-1, 1]) {
+        ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + sgn * 50, hy - 50, hx + sgn * 90, hy - 110);
+        ctx.moveTo(hx + sgn * 40, hy - 45); ctx.lineTo(hx + sgn * 75, hy - 50);
+        ctx.moveTo(hx + sgn * 65, hy - 80); ctx.lineTo(hx + sgn * 40, hy - 105);
+      }
+      ctx.stroke();
+      glow(ctx, hx, hy - 60, 110, 'rgba(220,170,255,1)', 0.5);
+      ctx.restore();
+    }
+  }
+
   const DEFS = {
+    wolf: { draw: wolf, height: 300, scaleFix: 1.12, width: 560, hitY: 0.5, color: '#a78bfa', deathPose: true, sprite: 'wolf' },
     slime: { draw: slime, height: 230, scaleFix: 1.45, width: 330, hitY: 0.45, color: '#a78bfa' },
     skeleton: { draw: skeleton, height: 500, scaleFix: 1.1, width: 300, hitY: 0.55, color: '#7dd3fc' },
     general: { draw: general, height: 600, scaleFix: 0.92, width: 420, hitY: 0.55, color: '#f87171' },
@@ -586,6 +644,8 @@
     if (key === 'demonking') return DEFS['demonking' + (phase || 1)];
     return DEFS[key];
   }
+
+  loadSheet('wolf');
 
   window.Enemies = { def, glow, TAU };
 })();

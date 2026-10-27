@@ -96,7 +96,7 @@
 
   // Urutan musuh: 3 bawahan lalu Raja Iblis (2 fase).
   const PHASES = [
-    { enemy: 'slime', name: 'Slime Kegelapan', title: 'Penjaga Lembah Berkabut', stage: 1, weight: 0.15, counter: 20 },
+    { enemy: 'wolf', name: 'Serigala Kristal Bayangan', title: 'Penjaga Lembah Berkabut', stage: 1, weight: 0.15, counter: 20 },
     { enemy: 'skeleton', name: 'Ksatria Tengkorak', title: 'Penjaga Makam Kuno', stage: 2, weight: 0.2, counter: 25 },
     { enemy: 'general', name: 'Jenderal Iblis Vargoth', title: 'Tangan Kanan Raja Iblis', stage: 3, weight: 0.2, counter: 30 },
     { enemy: 'demonking', name: 'Raja Iblis Azaroth', title: 'Penguasa Kegelapan', stage: 4, phase: 1, weight: 0.2, counter: 30 },

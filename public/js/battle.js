@@ -117,8 +117,8 @@
       this.enemy = {
         key: info.key, phase: info.phase || 1, name: info.name, title: info.title, def,
         hp: info.hp, hpMax: info.hpMax, shownHp: info.hp,
-        x: ENEMY_X, y: ENEMY_Y, ox: 0, oy: 0, st: { t: 0, atk: 0 },
-        atkT: -1, hitT: 0, alpha: entrance ? 0 : 1, enter: entrance ? 0 : 1, dying: -1, scale: 1,
+        x: ENEMY_X, y: ENEMY_Y, ox: 0, oy: 0, st: { t: 0, atk: 0, skill: 0, dying: -1 },
+        atkT: -1, skillT: -1, hitT: 0, alpha: entrance ? 0 : 1, enter: entrance ? 0 : 1, dying: -1, scale: 1,
       };
       if (info.stage) { this.stage = info.stage; this.phase = info.phase || 1; }
     }
@@ -134,6 +134,7 @@
       Sfx.roar();
       this.shake = 10;
       await this.tween(1200, (k) => { e.enter = easeOut(k); e.alpha = k; });
+      if (e.def.sprite) { e.skillT = 0; e.skillDur = 1.6; Sfx.roar(); this.shake = 12; }
       this.showBanner(e.title ? `STAGE ${this.stage}` : '', e.name, e.def.color, 2200, e.title);
       await this.wait(900);
     }
@@ -205,6 +206,7 @@
           if (type === 'dagger') self.emit(p.x, p.y, '190,120,255', 5, -60, 0, 0.25);
           if (type === 'arrow') self.emit(p.x, p.y, '120,255,160', 4, -50, 0, 0.25);
           if (type === 'blob') self.emit(p.x, p.y, '170,90,255', 7, 0, 0, 0.3, 200);
+          if (type === 'shard' || type === 'claw') self.emit(p.x, p.y, '190,120,255', 6, 0, -40, 0.3);
           if (this.t >= this.dur && !this.done) { this.done = true; onHit && onHit(p); }
           return !this.done;
         },
@@ -260,6 +262,21 @@
             ctx.fillStyle = '#7c3aed'; ctx.strokeStyle = '#1e0533'; ctx.lineWidth = 4;
             ctx.beginPath(); ctx.ellipse(0, 0, 22, 18, self.t * 3, 0, TAU); ctx.fill(); ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(-6, -6, 5, 0, TAU); ctx.fill();
+          } else if (type === 'claw') {
+            ctx.rotate(ang);
+            for (let i = 0; i < 3; i++) {
+              ctx.strokeStyle = `rgba(200,140,255,${0.95 - i * 0.2})`; ctx.lineWidth = 8;
+              ctx.beginPath(); ctx.arc(-30, (i - 1) * 22, 55, -1.0, 1.0); ctx.stroke();
+            }
+            glow(ctx, 0, 0, 70, 'rgba(170,90,255,1)', 0.6);
+          } else if (type === 'shard') {
+            ctx.rotate(ang - Math.PI / 2);
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = '#c084fc'; ctx.strokeStyle = '#3b0764'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(0, 34); ctx.lineTo(11, 0); ctx.lineTo(0, -26); ctx.lineTo(-11, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.moveTo(0, 26); ctx.lineTo(4, 0); ctx.lineTo(0, -18); ctx.fill();
+            ctx.globalCompositeOperation = 'lighter';
+            glow(ctx, 0, 0, 50, 'rgba(180,90,255,1)', 0.7);
           } else if (type === 'boneSlash') {
             ctx.rotate(ang);
             for (let i = 0; i < 3; i++) {
@@ -289,6 +306,8 @@
       if (e) {
         e.st.t += dt;
         if (e.atkT >= 0) { e.atkT += dt / (e.atkDur || 1.2); e.st.atk = Math.min(1, e.atkT); if (e.atkT >= 1) { e.atkT = -1; e.st.atk = 0; } }
+        if (e.skillT >= 0) { e.skillT += dt / (e.skillDur || 1.4); e.st.skill = Math.min(1, e.skillT); if (e.skillT >= 1) { e.skillT = -1; e.st.skill = 0; } }
+        e.st.dying = e.dying;
         e.hitT = Math.max(0, e.hitT - dt * 3);
         e.ox *= Math.pow(0.002, dt);
         e.barHp = e.barHp == null ? e.shownHp : e.barHp + (e.shownHp - e.barHp) * Math.min(1, dt * 6);
@@ -418,7 +437,11 @@
       const enterX = lerp(560, 0, e.enter);
       let alpha = e.alpha;
       let sink = 0;
-      if (e.dying >= 0) { alpha *= 1 - ease((e.dying - 0.4) / 0.6); sink = ease(e.dying) * 40; }
+      if (e.dying >= 0) {
+        // musuh bersprite punya pose "mati": tampilkan dulu, baru memudar
+        if (e.def.deathPose) alpha *= 1 - ease((e.dying - 0.65) / 0.35);
+        else { alpha *= 1 - ease((e.dying - 0.4) / 0.6); sink = ease(e.dying) * 40; }
+      }
       if (alpha <= 0.01) return;
       ctx.save();
       ctx.translate(e.x + enterX + e.ox, e.y + sink);
@@ -434,7 +457,7 @@
       let filter = 'none';
       if (e.hitT > 0.6) filter = 'brightness(3)';
       else if (e.hitT > 0) filter = `brightness(${1 + e.hitT}) saturate(${1 + e.hitT})`;
-      if (e.dying >= 0) filter = `brightness(${1 + Math.abs(Math.sin(e.dying * 30)) * 1.5}) saturate(0.6)`;
+      if (e.dying >= 0 && (!e.def.deathPose || e.dying < 0.12)) filter = `brightness(${1 + Math.abs(Math.sin(e.dying * 30)) * 1.5}) saturate(0.6)`;
       if (e.tint) filter = e.tint;
       ctx.filter = filter;
       e.def.draw(ctx, e.st);
@@ -783,10 +806,19 @@
     async enemyCounter(targets, payload) {
       const e = this.enemy;
       if (!e || !targets.length) return;
-      e.atkT = 0; e.atkDur = 1.2;
-      Sfx.enemyAttack();
-      await this.wait(560);
       const key = e.key === 'demonking' ? 'demonking' + e.phase : e.key;
+      // serigala memakai skill (lolongan + hujan kristal) bila banyak yang salah
+      const useSkill = key === 'wolf' && targets.length >= Math.max(2, this.actors.size * 0.5);
+      if (useSkill) {
+        e.skillT = 0; e.skillDur = 1.5;
+        Sfx.roar(); this.shake = 14;
+        this.addText(e.x - 60, e.y - e.def.height * 1.45, 'Lolongan Kristal!', '#d8b4fe', 44, { dur: 1.6, vy: -20 });
+        await this.wait(700);
+      } else {
+        e.atkT = 0; e.atkDur = 1.2;
+        Sfx.enemyAttack();
+        await this.wait(560);
+      }
       const head = this.enemyHead();
       const proms = targets.map((t, i) => new Promise((res) => {
         const a = this.actors.get(t.id);
@@ -805,7 +837,10 @@
         };
         const to = { x: a.x, y: a.y - a.h * 0.55 };
         setTimeout(() => {
-          if (key === 'slime') this.projectile('blob', { x: head.x - 80, y: head.y }, to, 0.6, doHit);
+          if (key === 'wolf') {
+            if (useSkill) this.projectile('shard', { x: a.x + rand(-60, 120), y: -80 }, to, 0.5, doHit);
+            else this.projectile('claw', { x: head.x - 160, y: head.y }, to, 0.42, doHit);
+          } else if (key === 'slime') this.projectile('blob', { x: head.x - 80, y: head.y }, to, 0.6, doHit);
           else if (key === 'skeleton') this.projectile('boneSlash', { x: head.x - 120, y: head.y }, to, 0.45, doHit);
           else if (key === 'general') this.projectile('orb', { x: head.x - 150, y: head.y + 40 }, to, 0.5, doHit);
           else if (key === 'demonking1') { this.bolt(a.x, a.y, '200,120,255'); setTimeout(doHit, 120); } else { this.skyFire(a, doHit); }
