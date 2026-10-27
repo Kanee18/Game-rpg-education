@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#140a26">
+  <title>Gabung Petualangan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="play">
+  <div class="conn" id="conn" hidden>Menyambung ulang…</div>
+
+  <!-- 1. Kode ruang -->
+  <section class="screen" id="s-code">
+    <div class="p-hero">
+      <div class="p-logo">⚔️</div>
+      <h1>Petualangan Melawan <span>Raja Iblis</span></h1>
+      <p>Pindai QR di layar guru, atau masukkan kode ruang.</p>
+    </div>
+    <form class="p-card" id="form-code">
+      <label>Kode ruang
+        <input id="in-code" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="ABCDE" inputmode="text">
+      </label>
+      <button class="btn btn-gold btn-big" type="submit">Lanjut ➜</button>
+      <p class="err" id="code-err"></p>
+    </form>
+  </section>
+
+  <!-- 2. Nama + karakter -->
+  <section class="screen" id="s-profile" hidden>
+    <div class="p-head">
+      <div class="kicker" id="room-title">Ruang <span id="room-label"></span></div>
+      <h2>Buat Petualangmu</h2>
+    </div>
+    <form id="form-join" class="p-card">
+      <label>Nama petualang
+        <input id="in-name" maxlength="16" autocomplete="off" placeholder="Nama kamu">
+      </label>
+      <div class="label">Pilih karakter</div>
+      <div class="char-grid" id="char-grid"></div>
+      <div class="char-detail" id="char-detail"></div>
+      <button class="btn btn-gold btn-big" type="submit" id="btn-join">Gabung Party ⚔️</button>
+      <p class="err" id="join-err"></p>
+    </form>
+  </section>
+
+  <!-- 3. Kontroler -->
+  <section class="screen" id="s-game" hidden>
+    <header class="p-bar">
+      <div class="me"><span class="dot" id="me-dot"></span><b id="me-name"></b></div>
+      <div class="stat">⭐ <b id="me-score">0</b></div>
+      <div class="stat">#<b id="me-rank">-</b></div>
+    </header>
+    <div class="hp-line"><div class="hp-fill" id="me-hp"></div></div>
+
+    <div class="view" id="v-wait">
+      <canvas class="avatar" id="cv-wait" width="300" height="320"></canvas>
+      <h2 id="wait-title">Kamu sudah bergabung!</h2>
+      <p id="wait-sub">Tunggu guru memulai petualangan…</p>
+    </div>
+
+    <div class="view" id="v-question" hidden>
+      <div class="pq-top"><span id="pq-num">Soal 1/20</span><span id="pq-enemy"></span></div>
+      <div class="pq-timer"><div id="pq-timer-bar"></div></div>
+      <p class="pq-text" id="pq-text"></p>
+      <div class="answer-grid" id="answer-grid">
+        <button class="ans opt-0" data-k="0"><span class="shape">▲</span><b>A</b><span class="txt"></span></button>
+        <button class="ans opt-1" data-k="1"><span class="shape">◆</span><b>B</b><span class="txt"></span></button>
+        <button class="ans opt-2" data-k="2"><span class="shape">●</span><b>C</b><span class="txt"></span></button>
+        <button class="ans opt-3" data-k="3"><span class="shape">■</span><b>D</b><span class="txt"></span></button>
+      </div>
+    </div>
+
+    <div class="view" id="v-locked" hidden>
+      <div class="locked-letter" id="locked-letter">A</div>
+      <h2>Jawaban terkunci!</h2>
+      <p>Lihat layar guru… karaktermu bersiap bertarung.</p>
+    </div>
+
+    <div class="view" id="v-result" hidden>
+      <div class="res-banner" id="res-banner">BENAR!</div>
+      <canvas class="avatar" id="cv-result" width="300" height="320"></canvas>
+      <div class="res-points" id="res-points">+0</div>
+      <p class="res-detail" id="res-detail"></p>
+    </div>
+
+    <div class="view" id="v-final" hidden>
+      <div class="res-banner" id="final-banner">KEMENANGAN!</div>
+      <canvas class="avatar" id="cv-final" width="300" height="320"></canvas>
+      <div class="final-rank">Peringkat <b id="final-rank">-</b></div>
+      <div class="final-stats" id="final-stats"></div>
+      <button class="btn" id="btn-leave">Keluar</button>
+    </div>
+  </section>
+
+  <section class="screen" id="s-msg" hidden>
+    <div class="p-hero">
+      <div class="p-logo" id="msg-icon">🚪</div>
+      <h1 id="msg-title">Kamu keluar dari ruang</h1>
+      <p id="msg-text"></p>
+      <button class="btn btn-gold" onclick="location.href='/play'">Gabung ruang lain</button>
+    </div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/shared/characters.js"></script>
+  <script src="/js/sprites.js"></script>
+  <script src="/js/play.js"></script>
+</body>
+</html>

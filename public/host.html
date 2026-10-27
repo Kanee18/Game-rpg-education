@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Layar Guru — Petualangan Melawan Raja Iblis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="host">
+
+<!-- ============================ PENGATURAN SOAL ============================ -->
+<section id="setup" class="page">
+  <header class="hero">
+    <div class="hero-badge">Modul Ajar Berbasis Game</div>
+    <h1>Petualangan Melawan <span>Raja Iblis</span></h1>
+    <p>Siapkan soal, buat ruang petualangan, lalu siswa memindai QR dengan HP untuk bergabung ke party (maks. 20 petualang).</p>
+  </header>
+
+  <div class="setup-grid">
+    <aside class="card settings">
+      <h2>⚙️ Pengaturan</h2>
+      <label>Judul materi
+        <input id="set-title" maxlength="80" placeholder="mis. Matematika Kelas 7 — Pecahan">
+      </label>
+      <label>Waktu per soal
+        <select id="set-time">
+          <option value="10">10 detik</option>
+          <option value="15">15 detik</option>
+          <option value="20" selected>20 detik</option>
+          <option value="30">30 detik</option>
+          <option value="45">45 detik</option>
+          <option value="60">60 detik</option>
+          <option value="90">90 detik</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="set-shuffle"> Acak urutan soal</label>
+      <div class="plan" id="plan"></div>
+      <button class="btn btn-gold btn-big" id="btn-create">⚔️ Buat Ruang Petualangan</button>
+      <p class="hint" id="setup-error"></p>
+      <div class="howto">
+        <h3>Alur permainan</h3>
+        <ol>
+          <li>Tampilkan layar ini di proyektor/TV.</li>
+          <li>Siswa memindai QR → isi nama → pilih karakter.</li>
+          <li>HP siswa berubah menjadi tombol <b>A B C D</b>.</li>
+          <li>Jawaban benar = karakter menyerang & dapat poin. Salah = terkena serangan musuh.</li>
+          <li>Benar 3× berturut-turut = <b>ULTIMATE!</b></li>
+          <li>Kalahkan 3 bawahan lalu Raja Iblis (punya Fase 2).</li>
+        </ol>
+      </div>
+    </aside>
+
+    <main class="card editor">
+      <div class="editor-head">
+        <h2>📜 Bank Soal <small id="q-count"></small></h2>
+        <div class="editor-actions">
+          <button class="btn btn-sm" id="btn-add">＋ Tambah soal</button>
+          <button class="btn btn-sm" id="btn-paste">📋 Tempel teks</button>
+          <button class="btn btn-sm" id="btn-import">📂 Impor JSON</button>
+          <button class="btn btn-sm" id="btn-export">💾 Ekspor JSON</button>
+          <button class="btn btn-sm btn-ghost" id="btn-reset">↺ Contoh soal</button>
+          <input type="file" id="file-import" accept=".json,application/json" hidden>
+        </div>
+      </div>
+      <div id="q-list" class="q-list"></div>
+    </main>
+  </div>
+</section>
+
+<!-- Modal tempel teks -->
+<dialog id="paste-dialog" class="dialog">
+  <form method="dialog">
+    <h2>📋 Tempel soal dari teks</h2>
+    <p class="hint">Pisahkan tiap soal dengan baris kosong. Tandai jawaban benar dengan <b>*</b> di akhir pilihan, atau tulis <code>Jawaban: B</code>.</p>
+<pre class="example">1. Ibu kota Indonesia adalah …
+A. Bandung
+B. Nusantara*
+C. Surabaya
+D. Medan
+
+2. 5 × 6 = …
+A. 11
+B. 30
+C. 56
+D. 35
+Jawaban: B</pre>
+    <textarea id="paste-text" rows="12" placeholder="Tempel soal di sini…"></textarea>
+    <p class="hint" id="paste-msg"></p>
+    <div class="dialog-actions">
+      <label class="check"><input type="checkbox" id="paste-replace"> Ganti semua soal yang ada</label>
+      <button class="btn" value="cancel">Batal</button>
+      <button class="btn btn-gold" id="paste-ok" value="ok">Tambahkan</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============================ LAYAR GAME ============================ -->
+<section id="game" hidden>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="ui">
+      <!-- Lobby -->
+      <div id="lobby" class="panel">
+        <div class="lobby-left">
+          <div class="lobby-title">
+            <div class="kicker" id="lobby-kicker">Ruang Petualangan</div>
+            <h1>Bergabunglah dengan Party!</h1>
+            <p>Pindai QR dengan kamera HP, isi nama, lalu pilih karakter.</p>
+          </div>
+          <div class="qr-card">
+            <img id="qr" alt="QR untuk bergabung">
+            <div class="qr-info">
+              <div class="label">Kode ruang</div>
+              <div class="code" id="room-code">-----</div>
+              <div class="label">atau buka</div>
+              <div class="url" id="join-url"></div>
+            </div>
+          </div>
+        </div>
+        <div class="lobby-right">
+          <div class="party-count"><span id="party-count">0</span>/20 petualang</div>
+          <div id="party-list" class="party-list"></div>
+          <button class="btn btn-gold btn-big" id="btn-start" disabled>⚔️ Mulai Petualangan</button>
+          <p class="hint">Klik nama untuk mengeluarkan pemain.</p>
+        </div>
+      </div>
+
+      <!-- Panel soal -->
+      <div id="qpanel" hidden>
+        <div class="q-top">
+          <div class="q-num" id="q-num">Soal 1/20</div>
+          <div class="q-answered" id="q-answered-box"></div>
+        </div>
+        <div class="q-text" id="q-text"></div>
+        <div class="q-options" id="q-options"></div>
+        <div class="q-timer"><div class="q-timer-bar" id="q-timer-bar"></div><div class="q-timer-num" id="q-timer-num">20</div></div>
+      </div>
+
+      <!-- Papan peringkat kecil -->
+      <div id="leader" class="panel" hidden>
+        <h3>🏆 Peringkat</h3>
+        <ol id="leader-list"></ol>
+      </div>
+
+      <!-- Info pojok -->
+      <div id="corner" hidden>
+        <img id="qr-mini" alt="">
+        <div><div class="label">Kode</div><div class="code-mini" id="code-mini"></div></div>
+      </div>
+
+      <!-- Tombol kontrol -->
+      <div id="controls" hidden>
+        <button class="btn" id="btn-skip" hidden>⏭ Akhiri waktu</button>
+        <button class="btn btn-gold" id="btn-next" hidden>▶ Soal berikutnya</button>
+        <button class="btn btn-ghost" id="btn-auto" title="Lanjut otomatis">Auto: Mati</button>
+        <button class="btn btn-ghost" id="btn-mute" title="Suara">🔊</button>
+        <button class="btn btn-ghost" id="btn-full" title="Layar penuh">⛶</button>
+        <button class="btn btn-ghost" id="btn-quit" title="Akhiri permainan">✕</button>
+      </div>
+
+      <!-- Hasil akhir -->
+      <div id="final" class="panel" hidden>
+        <h1 id="final-title">KEMENANGAN!</h1>
+        <p id="final-sub"></p>
+        <div class="podium" id="podium"></div>
+        <div class="final-table-wrap"><table class="final-table" id="final-table"></table></div>
+        <div class="final-actions">
+          <button class="btn" id="btn-csv">⬇️ Unduh hasil (CSV)</button>
+          <button class="btn btn-gold" id="btn-again">↺ Main lagi (soal sama)</button>
+          <button class="btn btn-ghost" id="btn-done">Selesai</button>
+        </div>
+      </div>
+      <div id="toast" hidden></div>
+    </div>
+  </div>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/shared/characters.js"></script>
+<script src="/js/questions-default.js"></script>
+<script src="/js/sfx.js"></script>
+<script src="/js/sprites.js"></script>
+<script src="/js/enemies.js"></script>
+<script src="/js/backgrounds.js"></script>
+<script src="/js/battle.js"></script>
+<script src="/js/editor.js"></script>
+<script src="/js/host.js"></script>
+</body>
+</html>

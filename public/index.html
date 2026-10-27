@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Petualangan Melawan Raja Iblis — Modul Ajar Game RPG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="landing">
+  <main class="landing-main">
+    <div class="hero-badge">Modul Ajar Berbasis Game • RPG Isekai</div>
+    <h1>Petualangan Melawan <span>Raja Iblis</span></h1>
+    <p>Siswa bergabung lewat HP, memilih karakter, lalu menjawab soal untuk menyerang pasukan Raja Iblis bersama-sama.</p>
+    <div class="landing-actions">
+      <a class="btn btn-gold btn-big" href="/host">🧙 Saya Guru — Buka Layar Utama</a>
+      <a class="btn btn-big" href="/play">📱 Saya Siswa — Gabung Party</a>
+    </div>
+    <div class="landing-chars" id="chars"></div>
+  </main>
+  <script src="/js/shared/characters.js"></script>
+  <script src="/js/sprites.js"></script>
+  <script>
+    (async function () {
+      const wrap = document.getElementById('chars');
+      const items = [];
+      for (const c of GameData.CHARACTERS) {
+        const cv = document.createElement('canvas');
+        cv.width = 180; cv.height = 210; cv.title = c.name;
+        const fig = document.createElement('figure');
+        fig.style.setProperty('--c', c.color);
+        fig.append(cv);
+        const cap = document.createElement('figcaption'); cap.textContent = c.name; fig.append(cap);
+        wrap.append(fig);
+        const a = new Sprites.Animator(c.id, c.fps); a.set('idle', true);
+        items.push({ cv, a, id: c.id });
+        Sprites.load(c.id);
+      }
+      let last = performance.now();
+      (function loop(now) {
+        const dt = (now - last) / 1000; last = now;
+        for (const it of items) {
+          it.a.update(dt);
+          const s = Sprites.get(it.id); const ctx = it.cv.getContext('2d');
+          ctx.clearRect(0, 0, 180, 210);
+          if (s) Sprites.draw(ctx, s, 'idle', it.a.frame(), 90, 205, 170);
+        }
+        requestAnimationFrame(loop);
+      })(last);
+    })();
+  </script>
+</body>
+</html>
